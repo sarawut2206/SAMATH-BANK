@@ -8644,7 +8644,7 @@ function buildSVGFromParams(p){
       case 'rotation':       return svgTransform('rotation', p.label||'');
       // สถิติ
       case 'bar_chart':      return svgBarChart(p.labels||[], p.values||[], p.title||'');
-      case 'pie_chart':      return svgPieChart(p.labels||[], p.values||[], p.title||'');
+      case 'pie_chart':      return svgPieChart(p.labels||[], p.values||[], p.title||'', {hideValues: p.hideValues===true, unit: p.unit||'คน'});
       case 'pictograph':     return svgPictograph(p.labels||[], p.values||[], p.unit||1, p.title||'');
       case 'line_graph':     return svgLineGraph(p.labels||[], p.values||[], p.title||'');
       case 'stem_leaf':      return svgStemLeaf(p.data||[], p.title||'');
@@ -8698,7 +8698,10 @@ function svgBarChart(labels, values, title){
 }
 
 // แผนภูมิวงกลม (Pie Chart) — คำนวณ arc จริง — ขนาดใหญ่ ตัวเลขชัด
-function svgPieChart(labels, values, title){
+function svgPieChart(labels, values, title, opt){
+  opt = opt || {};
+  const hideValues = opt.hideValues === true;   // ซ่อนจำนวนใน legend — กันเฉลยคำตอบ
+  const unit = opt.unit || 'คน';
   const n=labels.length; if(!n) return null;
   const total=values.reduce((a,b)=>a+b,0); if(!total) return null;
   // วงกลมอยู่ซ้าย legend อยู่ขวา
@@ -8737,14 +8740,14 @@ function svgPieChart(labels, values, title){
     const lbl=labels[i].length>10?labels[i].substring(0,10)+'…':labels[i];
     legend+=`<rect x="${lx}" y="${ly-12}" width="16" height="16" fill="${col}" rx="3"/>
     <text x="${lx+22}" y="${ly}" font-size="12" fill="#1e293b" font-weight="600">${lbl}</text>
-    <text x="${lx+22}" y="${ly+14}" font-size="11" fill="#64748b">${v} คน (${pct}%)</text>`;
+    <text x="${lx+22}" y="${ly+14}" font-size="11" fill="#64748b">${hideValues?`${pct}%`:`${v} ${unit} (${pct}%)`}</text>`;
     startAngle=endAngle;
   });
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:500px;background:#fff;border-radius:10px;display:block;margin:0 auto;">
     ${title?`<text x="${cx}" y="22" text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a">${title}</text>`:''}
     ${slices}${lineLabels}${legend}
-    <text x="${cx}" y="${H-6}" text-anchor="middle" font-size="11" fill="#94a3b8">รวม ${total}</text>
+    ${hideValues?'':`<text x="${cx}" y="${H-6}" text-anchor="middle" font-size="11" fill="#94a3b8">รวม ${total}</text>`}
   </svg>`;
 }
 
@@ -8987,6 +8990,29 @@ function needsCoordinatePlane(subtopic, topicName){
 
 // ===== ตรวจจับหัวข้อ "ทฤษฎีบทเกี่ยวกับวงกลม" ม.3 — ต้องบังคับใช้ circle_theorem =====
 // (คอร์ด เส้นสัมผัส มุมในวงกลม มุมที่จุดศูนย์กลาง — ต้องเห็นตำแหน่งจุด/เส้นจึงตอบได้)
+// ═══════════════════════════════════════════════════════════════════════
+// ===== NEXUS CHART TOPIC DETECTOR (NCTD) =====
+// ตรวจจับหัวข้อ "สถิติ/การอ่านแผนภูมิ" → คืนชนิดแผนภูมิที่ต้องวาด
+// ⚠️ ต้องตรวจก่อน geometry เสมอ! เพราะ "แผนภูมิรูปวงกลม" มีคำว่า "วงกลม"
+//    ซึ่งเดิมถูก NGOG จับไปสร้างโจทย์ "ความยาวรอบวง/พื้นที่วงกลม" ผิดหัวข้อ
+// ═══════════════════════════════════════════════════════════════════════
+function detectChartType(subtopic, topicName){
+  const txt = (subtopic+' '+(topicName||''));
+  // เรียงจากเฉพาะเจาะจง → กว้าง
+  if(/แผนภูมิ\s*รูป\s*วงกลม|แผนภูมิวงกลม|วงกลม\s*แสดงข้อมูล|pie\s*chart/i.test(txt)) return 'pie_chart';
+  if(/แผนภูมิ\s*รูปภาพ|pictograph/i.test(txt))                 return 'pictograph';
+  if(/แผนภูมิ\s*แท่ง|bar\s*chart/i.test(txt))                  return 'bar_chart';
+  if(/กราฟเส้น|line\s*graph/i.test(txt))                       return 'line_graph';
+  if(/ฮิสโท|histogram/i.test(txt))                             return 'histogram';
+  if(/ต้นใบ|ลำต้นและใบ|stem.?leaf/i.test(txt))                 return 'stem_leaf';
+  if(/แผนภาพกล่อง|box\s*plot/i.test(txt))                      return 'box_plot';
+  if(/แผนภาพจุด|dot\s*plot/i.test(txt))                        return 'dot_plot';
+  if(/แผนภาพเวนน์|เวนน์|venn/i.test(txt))                      return 'venn';
+  // หัวข้อสถิติทั่วไปที่ไม่ระบุชนิด → ไม่บังคับแผนภูมิ แต่ต้องกัน NGOG
+  if(/สถิติ|การนำเสนอข้อมูล|อ่านข้อมูลจากตาราง/.test(txt))     return 'stat_generic';
+  return null;
+}
+
 function needsCircleTheorem(subtopic, topicName){
   const txt=(subtopic+' '+topicName);
   return /ทฤษฎีบทเกี่ยวกับวงกลม|คอร์ดและเส้นสัมผัส|คอร์ดและมุมในวงกลม|ทฤษฎีบทเกี่ยวกับเส้นสัมผัส|ทฤษฎีบทวงกลม|ทฤษฎีบทเกี่ยวกับคอร์ด|มุมในวงกลม|คอร์ดในวงกลม/.test(txt);
@@ -9224,8 +9250,11 @@ async function regenSameQuestion(reason){
     return;
   }
 
-  // สลับระดับความยากชั่วคราวเมื่อพยายามหลายครั้งแล้ว — ช่วยให้ AI หลุดจากโจทย์รูปแบบเดิม
-  if(_qRegenAttempt === 6 && mcqLevel > 1) mcqLevel--;
+  // สร้างโจทย์ยากไม่สำเร็จ → ลดระดับความยากลง เพื่อให้ AI สร้างโจทย์ที่เรียบง่ายกว่าได้
+  if((_qRegenAttempt === 3 || _qRegenAttempt === 7) && mcqLevel > 1){
+    mcqLevel--;
+    console.warn('[NEXUS SEQ] ลดระดับความยากเป็น level '+mcqLevel+' เพื่อให้สร้างโจทย์สำเร็จ');
+  }
 
   addTyping();
   await delay(700 + Math.min(_qRegenAttempt,4)*400);
@@ -9289,10 +9318,48 @@ async function loadNextQ(){
   // needsCT  = ทฤษฎีบทวงกลม (circle_theorem)
   // needsSVG = เรขาคณิตทั่วไป (triangle/rectangle/cylinder ฯลฯ)
   const lvl=['ง่าย','ปานกลาง','ยาก'][mcqLevel-1];
-  const needsSVG = isGeoTopic(selectedSubtopic, selectedTopic.topic);
-  const needsCV = needsCubeViews(selectedSubtopic, selectedTopic.topic);
-  const needsCP = needsCoordinatePlane(selectedSubtopic, selectedTopic.topic);
-  const needsCT = needsCircleTheorem(selectedSubtopic, selectedTopic.topic);
+  const _chartType = detectChartType(selectedSubtopic, selectedTopic.topic);   // ⚠️ ตรวจก่อน geometry เสมอ
+  const needsSVG = !_chartType && isGeoTopic(selectedSubtopic, selectedTopic.topic);
+  const needsCV = !_chartType && needsCubeViews(selectedSubtopic, selectedTopic.topic);
+  const needsCP = !_chartType && needsCoordinatePlane(selectedSubtopic, selectedTopic.topic);
+  const needsCT = !_chartType && needsCircleTheorem(selectedSubtopic, selectedTopic.topic);
+
+  // ── CHART PROMPT SECTION — บังคับให้โจทย์เป็น "การอ่านแผนภูมิ" ไม่ใช่เรขาคณิต ──
+  const _CHART_TH = {pie_chart:'แผนภูมิรูปวงกลม', pictograph:'แผนภูมิรูปภาพ', bar_chart:'แผนภูมิแท่ง',
+                     line_graph:'กราฟเส้น', histogram:'ฮิสโทแกรม', stem_leaf:'แผนภาพต้นใบ',
+                     box_plot:'แผนภาพกล่อง', dot_plot:'แผนภาพจุด', venn:'แผนภาพเวนน์'};
+  const _CHART_SCHEMA = {
+    pie_chart:  '{"type":"pie_chart","labels":["ชนิด A","ชนิด B","ชนิด C","ชนิด D"],"values":[จำนวนจริงแต่ละหมวด],"title":"...","hideValues":true}',
+    pictograph: '{"type":"pictograph","labels":[...],"values":[...],"unit":ค่าต่อ1รูป,"title":"..."}',
+    bar_chart:  '{"type":"bar_chart","labels":[...],"values":[...],"title":"..."}',
+    line_graph: '{"type":"line_graph","labels":[...],"values":[...],"title":"..."}',
+    histogram:  '{"type":"histogram","intervals":["10-19","20-29",...],"freqs":[...],"title":"..."}',
+    stem_leaf:  '{"type":"stem_leaf","data":[ตัวเลขดิบทั้งหมด],"title":"..."}',
+    box_plot:   '{"type":"box_plot","min":..,"q1":..,"median":..,"q3":..,"max":..,"title":"..."}',
+    dot_plot:   '{"type":"dot_plot","data":[ตัวเลขดิบ],"title":"..."}',
+    venn:       '{"type":"venn","setA":[...],"setB":[...],"intersect":[...],"labelA":"A","labelB":"B"}'
+  };
+  let _chartPromptSection = '';
+  if(_chartType && _chartType !== 'stat_generic'){
+    _chartPromptSection = `
+
+════ ⚠️ MANDATORY CHART MODE — หัวข้อนี้คือ "${_CHART_TH[_chartType]}" (สถิติ/การอ่านข้อมูล) ════
+❌ ห้ามเด็ดขาด: ออกโจทย์เรขาคณิต เช่น ความยาวรอบวง เส้นรอบวง พื้นที่วงกลม รัศมี เส้นผ่านศูนย์กลาง มุมที่จุดศูนย์กลาง สูตร $2\\pi r$ หรือ $\\pi r^{2}$
+   — คำว่า "วงกลม" ในหัวข้อนี้หมายถึง "รูปแบบของแผนภูมิ" เท่านั้น ไม่ใช่รูปเรขาคณิตที่ต้องหาความยาว/พื้นที่
+✅ ต้องออกโจทย์ประเภท "อ่านและตีความข้อมูลจากแผนภูมิ" ตามตัวชี้วัด ${selectedTopic.indicator} เท่านั้น เช่น
+   - หมวดใดมีจำนวนมากที่สุด/น้อยที่สุด
+   - หมวด X มีจำนวนเท่าใด (จากร้อยละ × จำนวนรวม)
+   - หมวด X มากกว่า/น้อยกว่าหมวด Y กี่หน่วย
+   - หมวด X และ Y รวมกันได้เท่าใด / คิดเป็นร้อยละเท่าใดของทั้งหมด
+1. MANDATORY svgParams (ต้องส่งมาเสมอ ห้ามขาด):
+   ${_CHART_SCHEMA[_chartType]}
+2. ข้อมูลใน svgParams ต้อง "สอดคล้องกับ q, correctValue และ choices" ทุกตัวเลข — คำนวณให้ถูกต้องก่อนตอบ
+3. "q" ต้องอ้างถึงแผนภูมิ เช่น "จากแผนภูมิที่กำหนด ..." และระบุจำนวนรวมทั้งหมด (เช่น "นักเรียนทั้งหมด 200 คน") เมื่อจำเป็นต่อการคำนวณ
+4. ใช้บริบทที่นักเรียน ${selectedGrade} คุ้นเคย (ผลไม้ที่ชอบ กีฬาที่ชอบ วิชาที่ชอบ สัตว์เลี้ยง สีที่ชอบ ฯลฯ)
+5. ตัวเลขต้องคำนวณลงตัวสวยงาม เหมาะกับระดับชั้น ${selectedGrade} (ร้อยละที่รวมกันได้ 100 พอดี และคูณกับจำนวนรวมแล้วเป็นจำนวนเต็ม)
+6. ห้ามใช้ LaTeX ซับซ้อนใน q — ใช้ตัวเลขธรรมดาได้ เช่น "25%" "200 คน"
+════════════════════════════════════════════════════════════════════`;
+  }
 
   // ── [3] OBJECT GENERATOR ─────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════
@@ -9472,7 +9539,7 @@ CONTEXT:
 - Lesson: ${selectedTopic.topic}
 - Grade: ${selectedGrade}
 - Difficulty: ${lvl} (Question ${qIndex+1}/${TOTAL_Q}) — ต้องสอดคล้องกับมาตรฐานหลักสูตรของบทเรียนหลักเสมอ ไม่ตีความใหม่จาก Topic ที่ครูพิมพ์เอง
-- Curriculum Standard: ${selectedTopic.indicator}${historyHint}${_qRegenAttempt>0?`
+- Curriculum Standard: ${selectedTopic.indicator}${historyHint}${_chartPromptSection}${_qRegenAttempt>0?`
 
 ⚠️ REGENERATION (attempt #${_qRegenAttempt+1}) — โจทย์ที่สร้างก่อนหน้านี้สำหรับ "ข้อที่ ${qIndex+1}" ไม่ผ่านการตรวจสอบคุณภาพ
 - ห้ามสร้างโจทย์แบบเดิมซ้ำ ต้อง "เปลี่ยนโจทย์ใหม่ทั้งหมด" — เปลี่ยนตัวเลข บริบท และรูปแบบคำถามให้ต่างจากเดิม
@@ -9554,6 +9621,25 @@ ${jsonTemplate}`;
     if(!_hasNumber && !_hasLatex){
       console.warn('[NEXUS] q has no math expression → retry:', q.q.slice(0,80));
       throw new Error('q-no-math: โจทย์ไม่มีตัวเลขหรือสมการ');
+    }
+
+    // ===== CHART MODE VALIDATION — หัวข้อสถิติต้องได้แผนภูมิถูกชนิด + ห้ามเนื้อหาเรขาคณิต =====
+    if(_chartType && _chartType !== 'stat_generic'){
+      const sp = q.svgParams;
+      if(!sp || sp.type !== _chartType){
+        throw new Error('chart-type-mismatch: ต้องเป็น '+_chartType+' แต่ได้ '+(sp&&sp.type||'ไม่มี svgParams'));
+      }
+      // ตรวจว่าข้อมูลมีจริง (labels/values หรือ data ตามชนิด)
+      const _hasData = (Array.isArray(sp.values) && sp.values.length>0)
+                    || (Array.isArray(sp.data) && sp.data.length>0)
+                    || (Array.isArray(sp.freqs) && sp.freqs.length>0)
+                    || (Array.isArray(sp.setA) && Array.isArray(sp.setB))
+                    || (typeof sp.median === 'number');
+      if(!_hasData) throw new Error('chart-no-data: svgParams ไม่มีข้อมูล');
+      // ⛔ กันโจทย์เรขาคณิตหลุดเข้ามาในหัวข้อแผนภูมิ (เส้นรอบวง/พื้นที่/รัศมี)
+      if(/เส้นรอบวง|ความยาวรอบวง|พื้นที่ของวงกลม|พื้นที่วงกลม|รัศมี|เส้นผ่านศูนย์กลาง|\\pi\s*r|2\\pi|\\pi\s*\{?r\^/.test(q.q+' '+(q.explain||''))){
+        throw new Error('chart-geometry-leak: โจทย์เป็นเรขาคณิต ไม่ใช่การอ่านแผนภูมิ');
+      }
     }
 
     // ===== บังคับว่าหัวข้อที่ต้องมีภาพประกอบ (มิติสัมพันธ์ / เรขาคณิตวิเคราะห์ / ทฤษฎีบทวงกลม) ต้องมี svgParams ที่ถูกต้องเสมอ =====
