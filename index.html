@@ -3,23 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SAMATH STUDIO • คลังเอกสาร–ข้อสอบคณิตศาสตร์ ป.1–ม.6</title>
+<title>SAMATH Craft AI • สร้างหนังสือ–ข้อสอบ และวิเคราะห์นักเรียนรายบุคคล</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M42 6H20L6 22h22z' fill='%233b82f6'/%3E%3Cpath d='M28 22H6l14 14h22z' fill='%232563eb'/%3E%3Cpath d='M22 58h22l14-16H36z' fill='%238b5cf6'/%3E%3Cpath d='M36 42h22L44 28H22z' fill='%236d28d9'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#12212b; --ink2:#24384a; --muted:#6b7f8d; --dim:#9aabb5;
-  --paper:#eef1f0; --card:#ffffff; --card2:#f7f9f8;
-  --line:#d5dedb; --line2:#c0cdc8;
-  --teal:#0d7a6f; --teal2:#0a5f56; --tealsoft:#e4f2f0;
-  --brass:#a8791f; --brasssoft:#fbf3e2;
-  --stamp:#b8372c; --stampsoft:#fceeec;
-  --ok:#15803d; --warn:#b45309; --danger:#b91c1c;
-  --rail:#0f1c24;
+  /* SAMATH Craft AI — โทนสว่าง น้ำเงิน→ม่วง ตามอัตลักษณ์โลโก้ */
+  --ink:#14203a; --ink2:#2b3a5c; --muted:#6b7a95; --dim:#a3aec4;
+  --paper:#f5f7fc; --card:#ffffff; --card2:#f7f9ff;
+  --line:#e2e7f2; --line2:#cfd7e8;
+  --teal:#2563eb; --teal2:#4f2ecc; --tealsoft:#eef3ff;      /* หลัก = น้ำเงินโลโก้ */
+  --brass:#7c3aed; --brasssoft:#f5f0ff;                      /* รอง = ม่วงโลโก้ */
+  --spark:#22d3ee; --sparksoft:#e6fbff;                      /* ประกาย */
+  --grad:linear-gradient(135deg,#2563eb 0%,#4f46e5 50%,#7c3aed 100%);
+  --stamp:#e11d68; --stampsoft:#fdeef4;
+  --ok:#0f9d58; --warn:#c2740a; --danger:#dc2626;
+  --rail:#ffffff;
   --r:10px; --r2:14px;
-  --sh:0 1px 2px rgba(18,33,43,.06),0 4px 14px rgba(18,33,43,.05);
-  --sh2:0 2px 6px rgba(18,33,43,.08),0 18px 40px rgba(18,33,43,.10);
+  --sh:0 1px 2px rgba(37,99,235,.05),0 4px 14px rgba(37,99,235,.06);
+  --sh2:0 2px 6px rgba(37,99,235,.08),0 18px 40px rgba(79,70,229,.12);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;}
@@ -40,11 +44,10 @@ a{color:var(--teal);}
 
 /* ══ GATE ══ */
 #gate{position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;padding:20px;
-  background:radial-gradient(ellipse at 25% 15%,#16323c 0%,#0f1c24 55%,#0a141a 100%);}
-.gate-card{width:100%;max-width:460px;background:var(--card);border-radius:18px;padding:34px 32px 28px;box-shadow:0 30px 80px rgba(0,0,0,.4);}
+  background:radial-gradient(ellipse at 20% 10%,#e8efff 0%,#f5f7fc 45%,#f3ecff 100%);}
+.gate-card{width:100%;max-width:460px;background:var(--card);border-radius:20px;padding:34px 32px 28px;border:1px solid var(--line);box-shadow:0 24px 70px rgba(79,70,229,.16);}
 .gate-mark{display:flex;align-items:center;gap:11px;margin-bottom:18px;}
-.gate-glyph{width:44px;height:44px;border-radius:11px;background:var(--ink);color:#fff;display:grid;place-items:center;
-  font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:19px;letter-spacing:-.5px;}
+.gate-glyph{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;}
 .gate-title{font-size:22px;font-weight:700;line-height:1.2;}
 .gate-sub{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
 .fld{margin-bottom:14px;}
@@ -57,8 +60,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);background:#fff
 textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;border-radius:var(--r);
   font-weight:600;font-size:14px;transition:all .15s;border:1.5px solid transparent;white-space:nowrap;}
-.btn-primary{background:var(--teal);color:#fff;box-shadow:0 2px 8px rgba(13,122,111,.28);}
-.btn-primary:hover{background:var(--teal2);transform:translateY(-1px);}
+.btn-primary{background:var(--grad);color:#fff;box-shadow:0 2px 10px rgba(79,70,229,.30);}
+.btn-primary:hover{filter:brightness(1.07);transform:translateY(-1px);box-shadow:0 4px 16px rgba(79,70,229,.38);}
 .btn-ghost{background:var(--card);border-color:var(--line);color:var(--ink2);}
 .btn-ghost:hover{border-color:var(--teal);color:var(--teal);background:var(--tealsoft);}
 .btn-dark{background:var(--ink);color:#fff;}
@@ -74,19 +77,21 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 /* ══ SHELL ══ */
 #shell{display:none;height:100vh;}
 #shell.on{display:grid;grid-template-columns:224px 1fr;}
-.rail{background:var(--rail);color:#c6d5dc;display:flex;flex-direction:column;overflow-y:auto;}
+.rail{background:var(--rail);color:var(--ink2);display:flex;flex-direction:column;overflow-y:auto;border-right:1px solid var(--line);}
 .rail-head{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.08);}
 .rail-mark{display:flex;align-items:center;gap:9px;}
-.rail-glyph{width:34px;height:34px;border-radius:9px;background:var(--teal);color:#fff;display:grid;place-items:center;
+.rail-glyph{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
   font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15px;}
-.rail-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:16px;color:#fff;line-height:1.15;}
+.rail-name{font-family:'Chakra Petch',sans-serif;font-weight:700;font-size:15.5px;color:var(--ink);line-height:1.15;}
+.rail-craft{font-weight:500;color:var(--brass);}
+.scmark{display:block;}
 .rail-ver{font-size:10.5px;color:#7f96a1;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;}
 .rail-nav{padding:10px 10px;flex:1;}
 .rail-sec{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#637984;padding:14px 10px 6px;font-weight:600;}
 .rail-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border-radius:9px;
   color:#b6c8d1;font-size:14px;font-weight:500;text-align:left;transition:all .13s;margin-bottom:2px;}
-.rail-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
-.rail-btn.on{background:var(--teal);color:#fff;font-weight:600;}
+.rail-btn:hover{background:var(--tealsoft);color:var(--teal);}
+.rail-btn.on{background:var(--grad);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(79,70,229,.25);}
 .rail-ico{width:20px;text-align:center;font-size:15px;flex-shrink:0;}
 .rail-foot{padding:12px;border-top:1px solid rgba(255,255,255,.08);font-size:11.5px;color:#7f96a1;}
 .rail-foot b{color:#cfe0e6;}
@@ -175,7 +180,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .dt{padding:10px 11px;border:1.5px solid var(--line);border-radius:9px;background:var(--card2);text-align:left;
   font-size:13px;font-weight:600;transition:all .13s;line-height:1.35;display:flex;gap:7px;align-items:flex-start;}
 .dt:hover{border-color:var(--teal);background:var(--tealsoft);}
-.dt.on{border-color:var(--teal);background:var(--teal);color:#fff;box-shadow:0 2px 8px rgba(13,122,111,.25);}
+.dt.on{border-color:transparent;background:var(--grad);color:#fff;box-shadow:0 2px 10px rgba(79,70,229,.28);}
 .dt small{display:block;font-weight:400;font-size:11px;opacity:.75;margin-top:1px;}
 
 /* ══ OUTPUT SHEET ══ */
@@ -220,7 +225,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .prog{display:none;padding:22px;text-align:center;}
 .prog.on{display:block;}
 .prog-bar{height:5px;background:var(--line);border-radius:4px;overflow:hidden;margin:12px auto;max-width:340px;}
-.prog-fill{height:100%;background:linear-gradient(90deg,var(--teal),var(--brass));transition:width .35s ease;width:0;}
+.prog-fill{height:100%;background:var(--grad);transition:width .35s ease;width:0;}
 .prog-txt{font-size:13.5px;color:var(--ink2);font-weight:500;}
 .prog-sub{font-size:12px;color:var(--muted);margin-top:4px;font-family:'IBM Plex Mono',monospace;}
 .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--teal);border-radius:50%;
@@ -271,7 +276,49 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .pickbox .pk.pk-cus{color:var(--teal2);}
 .pickbox.dim{opacity:.5;pointer-events:none;}
 .pkbar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
-.pkbar .pkcount{font-size:12.5px;color:var(--muted);margin-left:auto;}
+".pkbar .pkcount{font-size:12.5px;color:var(--muted);margin-left:auto;}
+.workarea{min-width:0;}
+.hdbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.w100{width:100%;}
+.mt20{margin-top:20px;} .mb10{margin-bottom:10px;}
+/* โครงเล่ม */
+.obox{background:var(--tealsoft);border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:6px 0;font-size:13px;color:var(--teal2);}
+.orow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;background:var(--card);}
+.orow.off{opacity:.42;}
+.orow .on-n{width:26px;height:26px;flex:none;border-radius:7px;background:var(--grad);color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:700;}
+.orow .on-t{flex:1;font-size:14px;line-height:1.35;}
+.orow .on-t small{display:block;font-size:11.5px;color:var(--muted);}
+.orow .on-b{display:flex;gap:3px;}
+.orow .on-b .btn{padding:4px 8px;}
+table.audit{width:100%;border-collapse:collapse;margin-top:8px;font-size:13.5px;}
+table.audit td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+table.audit .a-i{width:26px;font-weight:700;color:var(--ok);}
+table.audit tr:has(.a-i:not(:empty)) .a-d{color:var(--muted);}
+table.audit .a-d{color:var(--muted);text-align:right;}
+.bcover{text-align:center;padding:40px 0 30px;border-bottom:3px solid var(--teal);margin-bottom:18px;}
+.bcover-sub{color:var(--muted);font-size:14px;}
+/* ตารางบันทึกผลรายข้อ */
+.gridwrap{overflow:auto;max-height:460px;border:1px solid var(--line);border-radius:10px;}
+table.sgrid{border-collapse:collapse;font-size:13px;}
+table.sgrid th,table.sgrid td{border:1px solid var(--line);padding:3px 6px;text-align:center;white-space:nowrap;}
+table.sgrid th{background:var(--card2);position:sticky;top:0;z-index:2;}
+table.sgrid .sticky{position:sticky;left:0;background:var(--card);text-align:left;z-index:1;}
+table.sgrid th.sticky{z-index:3;}
+table.sgrid .colb,table.sgrid .rowb{font-size:12.5px;color:var(--teal);font-weight:600;padding:2px 4px;}
+table.sgrid .scnt{font-variant-numeric:tabular-nums;color:var(--muted);}
+table.sgrid input{width:15px;height:15px;cursor:pointer;}
+/* แผนที่ทักษะ */
+.mbar{display:inline-block;width:70px;height:8px;border-radius:5px;background:var(--line);overflow:hidden;vertical-align:middle;margin-right:6px;}
+.mbar i{display:block;height:100%;background:var(--grad);}
+.mtag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px;border:1px solid;}
+.mtag.m0{color:var(--muted);border-color:var(--line2);background:var(--card2);}
+.mtag.m1{color:#b3261e;border-color:#f0b4ae;background:#fdeeec;}
+.mtag.m2{color:#a3560c;border-color:#f0cfa4;background:#fdf3e6;}
+.mtag.m3{color:#1d4ed8;border-color:#b9ccf7;background:#eef3ff;}
+.mtag.m4{color:#6d28d9;border-color:#cebbf7;background:#f5f0ff;}
+.mtag.m5{color:#0b7a4b;border-color:#a5ddc3;background:#e9f8f1;}
+.planbox{border-top:2px dashed var(--line2);padding-top:14px;margin-top:14px;}
+.stupane{display:block;}
 /* ป้ายระดับความยากท้ายข้อ */
 .paper .qlv{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;border:1px solid;}
 .paper .qlv-e{color:#2c6e4f;border-color:#9fcbb4;background:#eaf6f0;}
@@ -351,13 +398,13 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
 <div id="gate">
   <div class="gate-card">
     <div class="gate-mark">
-      <div class="gate-glyph">SΣ</div>
+      <div class="gate-glyph"><svg class="scmark" viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="scB2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient><linearGradient id="scP2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><path d="M42 6H20L6 22h22z" fill="url(#scB2)"/><path d="M28 22H6l14 14h22z" fill="url(#scB2)" opacity=".82"/><path d="M22 58h22l14-16H36z" fill="url(#scP2)"/><path d="M36 42h22L44 28H22z" fill="url(#scP2)" opacity=".82"/><path d="M52 8l2.6 5.4L60 16l-5.4 2.6L52 24l-2.6-5.4L44 16l5.4-2.6z" fill="#22d3ee"/></svg></div>
       <div>
-        <div class="gate-title">SAMATH STUDIO</div>
-        <div class="gate-sub">Document &amp; Exam Foundry · v9.0</div>
+        <div class="gate-title">SAMATH <span style="font-weight:500;color:var(--brass)">Craft AI</span></div>
+        <div class="gate-sub">Book · Assessment · Student Insight · v10</div>
       </div>
     </div>
-    <p class="small mut mb20">โรงงานผลิตเอกสารการสอนและข้อสอบคณิตศาสตร์ ป.1–ม.6 อิงหลักสูตรแกนกลาง พ.ศ. 2551 (ฉบับปรับปรุง 2560)</p>
+    <p class="small mut mb20">สร้างหนังสือ เอกสารการสอน และข้อสอบคณิตศาสตร์ ป.1–ม.6 อิงหลักสูตรแกนกลาง พ.ศ. 2551 (ฉบับปรับปรุง 2560) แล้วนำผลสอบรายข้อมาวิเคราะห์นักเรียนรายบุคคล</p>
 
     <div class="fld">
       <label for="gKey">Anthropic API Key</label>
@@ -383,18 +430,20 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
   <nav class="rail">
     <div class="rail-head">
       <div class="rail-mark">
-        <div class="rail-glyph">SΣ</div>
+        <div class="rail-glyph"><svg class="scmark" viewBox="0 0 64 64" width="100%" height="100%" aria-label="SAMATH Craft AI"><defs><linearGradient id="scB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient><linearGradient id="scP" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><path d="M42 6H20L6 22h22z" fill="url(#scB)"/><path d="M28 22H6l14 14h22z" fill="url(#scB)" opacity=".82"/><path d="M22 58h22l14-16H36z" fill="url(#scP)"/><path d="M36 42h22L44 28H22z" fill="url(#scP)" opacity=".82"/><path d="M52 8l2.6 5.4L60 16l-5.4 2.6L52 24l-2.6-5.4L44 16l5.4-2.6z" fill="#22d3ee"/></svg></div>
         <div>
-          <div class="rail-name">SAMATH<br>STUDIO</div>
-          <div class="rail-ver">v9.0 · ป.1–ม.6</div>
+          <div class="rail-name">SAMATH <span class="rail-craft">Craft AI</span></div>
+          <div class="rail-ver">v10 · ป.1–ม.6</div>
         </div>
       </div>
     </div>
     <div class="rail-nav">
       <div class="rail-sec">พื้นที่ทำงาน</div>
-      <button class="rail-btn on" data-page="dash" onclick="go('dash')"><span class="rail-ico">◧</span><span class="lbl">แดชบอร์ด</span></button>
+      <button class="rail-btn on" data-page="dash" onclick="go('dash')"><span class="rail-ico">◧</span><span class="lbl">หน้าหลัก</span></button>
+      <button class="rail-btn" data-page="book" onclick="go('book')"><span class="rail-ico">▥</span><span class="lbl">สตูดิโอหนังสือ</span></button>
       <button class="rail-btn" data-page="doc" onclick="go('doc')"><span class="rail-ico">✎</span><span class="lbl">สร้างเอกสาร</span></button>
-      <button class="rail-btn" data-page="exam" onclick="go('exam')"><span class="rail-ico">▤</span><span class="lbl">สร้างข้อสอบ</span></button>
+      <button class="rail-btn" data-page="exam" onclick="go('exam')"><span class="rail-ico">▤</span><span class="lbl">สตูดิโอข้อสอบ</span></button>
+      <button class="rail-btn" data-page="stu" onclick="go('stu')"><span class="rail-ico">◑</span><span class="lbl">นักเรียน</span></button>
       <div class="rail-sec">คลัง</div>
       <button class="rail-btn" data-page="repo" onclick="go('repo')"><span class="rail-ico">▦</span><span class="lbl">คลังกลาง</span></button>
       <button class="rail-btn" data-page="curr" onclick="go('curr')"><span class="rail-ico">◈</span><span class="lbl">หลักสูตร</span></button>
@@ -440,6 +489,9 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <button class="qa-btn" onclick="qaDoc('worksheet')"><span class="qa-ico">▤</span><span class="qa-t">ใบงาน + เฉลย</span><span class="qa-d">แบบฝึกพร้อมเฉลยละเอียด คุมตามตัวชี้วัด</span></button>
               <button class="qa-btn" onclick="qaExam('unit')"><span class="qa-ico">◫</span><span class="qa-t">ข้อสอบเก็บคะแนน</span><span class="qa-d">ประจำหน่วย พร้อมตารางวิเคราะห์ข้อสอบ</span></button>
               <button class="qa-btn" onclick="qaExam('onet')"><span class="qa-ico">◈</span><span class="qa-t">ข้อสอบแนว O-NET</span><span class="qa-d">สำหรับติว ป.6 / ม.3 / ม.6</span></button>
+              <button class="qa-btn" onclick="qaBook('textbook')"><span class="qa-ico">▥</span><span class="qa-t">สร้างหนังสือทั้งเล่ม</span><span class="qa-d">วางโครงจากหลักสูตร แล้วสั่งเขียนทีละบท</span></button>
+              <button class="qa-btn" onclick="qaExam('achv')"><span class="qa-ico">✓</span><span class="qa-t">วัดผลสัมฤทธิ์ตามตัวชี้วัด</span><span class="qa-d">ทั้งชั้นปี พร้อมรหัสตัวชี้วัดกำกับทุกข้อ</span></button>
+              <button class="qa-btn" onclick="go('stu')"><span class="qa-ico">◑</span><span class="qa-t">วิเคราะห์นักเรียน</span><span class="qa-d">บันทึกผลรายข้อ แล้วดูแผนที่ทักษะรายคน</span></button>
             </div>
           </div>
         </div>
@@ -720,6 +772,179 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                 <p>กำหนดประเภท ระดับชั้น ขอบเขต และสัดส่วนความยากทางซ้าย แล้วกดสร้างข้อสอบ ระบบจะแนบเฉลยและตารางวิเคราะห์ข้อสอบมาให้ในชุดเดียวกัน</p>
               </div>
             </div></div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ═══════ BOOK STUDIO ═══════ -->
+      <section class="page" id="pg-book">
+        <div class="ph">
+          <h1>สตูดิโอหนังสือ</h1>
+          <p>สร้างเอกสาร “เป็นเล่ม” ทำ 3 ขั้นตอน — วางโครงเล่ม → ตรวจและปรับบท → สั่งสร้างทั้งเล่ม</p>
+        </div>
+
+        <div class="studio">
+          <div class="order">
+            <div class="card">
+              <div class="card-hd"><h3>ขั้นที่ 1 · ใบสั่งทำเล่ม</h3></div>
+              <div class="card-bd">
+                <div class="fld">
+                  <label>ประเภทเล่ม</label>
+                  <div class="dtg" id="bookTypeGrid"></div>
+                </div>
+                <div class="sepline"></div>
+                <div class="row2">
+                  <div class="fld">
+                    <label for="bGrade">ระดับชั้น</label>
+                    <select id="bGrade" onchange="bOnGrade()"></select>
+                  </div>
+                  <div class="fld">
+                    <label for="bLevel">ระดับความยาก</label>
+                    <select id="bLevel" onchange="bDirty()">
+                      <option>ง่าย</option><option selected>ปานกลาง</option><option>ยาก</option><option>คละระดับ</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="fld">
+                  <label>บทที่จะอยู่ในเล่ม (ติ๊กได้หลายบท)</label>
+                  <div class="pickbox" id="bTopicPick"></div>
+                  <div class="pkbar">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="bTopicAll(true)">เลือกทั้งหมด</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="bTopicAll(false)">ล้างที่เลือก</button>
+                    <span class="pkcount" id="bTopicCount"></span>
+                  </div>
+                </div>
+                <div class="row3">
+                  <div class="fld"><label for="bEx">ตัวอย่าง/บท</label>
+                    <input type="number" id="bEx" value="3" min="0" max="8" onchange="bDirty()"></div>
+                  <div class="fld"><label for="bDrill">แบบฝึก/บท</label>
+                    <input type="number" id="bDrill" value="6" min="0" max="20" onchange="bDirty()"></div>
+                  <div class="fld"><label for="bModel">คุณภาพ</label><select id="bModel"></select></div>
+                </div>
+                <div class="fld">
+                  <label>ส่วนประกอบของเล่ม</label>
+                  <div class="pickbox" id="bPartPick"></div>
+                </div>
+                <div class="fld">
+                  <label for="bNote">คำสั่งเพิ่มเติม (ถ้ามี)</label>
+                  <textarea id="bNote" placeholder="เช่น ใช้บริบทตลาดนัดและการเกษตร / เน้นนักเรียนที่พื้นฐานอ่อน"></textarea>
+                </div>
+                <button class="btn btn-primary w100" onclick="bPlan()">วางโครงเล่ม</button>
+                <div id="bCacheNote" class="note info mt10">โปรแกรมจะวางโครงจากหลักสูตรให้ก่อน ยังไม่เรียก AI และยังไม่เสียค่าใช้จ่าย</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="workarea">
+            <div class="card mb20" id="bOutlineCard" style="display:none">
+              <div class="card-hd"><h3>ขั้นที่ 2 · โครงเล่ม</h3>
+                <span class="chip teal" id="bOutlineChip">—</span></div>
+              <div class="card-bd">
+                <div id="bOutline"></div>
+                <div class="pkbar mt10">
+                  <button class="btn btn-primary" onclick="bBuild()">ขั้นที่ 3 · สร้างทั้งเล่ม</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bCheck()">ตรวจคุณภาพเล่ม</button>
+                  <span class="pkcount" id="bEstNote"></span>
+                </div>
+                <div id="bCheckOut" class="mt10"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-hd">
+                <h3>เล่มที่สร้าง</h3>
+                <div class="hdbtns">
+                  <span class="chip" id="bookBadge">ยังไม่มีเล่ม</span>
+                  <button class="btn btn-ghost btn-sm" onclick="printSheet('bookPaper')">พิมพ์</button>
+                  <button class="btn btn-ghost btn-sm" onclick="exportWord('bookPaper')">บันทึก .doc</button>
+                </div>
+              </div>
+              <div class="card-bd">
+                <div class="prog" id="bookProg" style="display:none">
+                  <div class="prog-bar"><div class="prog-fill" id="bookProgFill"></div></div>
+                  <div class="prog-txt" id="bookProgTxt">กำลังสร้าง…</div>
+                  <div class="prog-sub" id="bookProgSub"></div>
+                </div>
+                <div class="paper" id="bookPaper"><div class="empty">ยังไม่มีเล่ม — วางโครงเล่มทางซ้ายก่อน</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════ STUDENT INSIGHT ═══════ -->
+      <section class="page" id="pg-stu">
+        <div class="ph">
+          <h1>นักเรียน</h1>
+          <p>ทำ 3 ขั้น — ใส่รายชื่อ → บันทึกผลสอบรายข้อ → ดูแผนที่ทักษะและสร้างแผนพัฒนา</p>
+        </div>
+
+        <div class="tabs">
+          <button class="tab on" data-stu="roster" onclick="stuTab('roster')">1 · รายชื่อนักเรียน</button>
+          <button class="tab" data-stu="score" onclick="stuTab('score')">2 · บันทึกผลรายข้อ</button>
+          <button class="tab" data-stu="map" onclick="stuTab('map')">3 · แผนที่ทักษะและแผนพัฒนา</button>
+        </div>
+
+        <div id="stu-roster" class="stupane">
+          <div class="card mb20">
+            <div class="card-hd"><h3>ห้องเรียน</h3><span class="chip teal" id="stuRoomChip">—</span></div>
+            <div class="card-bd">
+              <div class="row2">
+                <div class="fld"><label for="stuRoom">ชื่อห้อง</label>
+                  <input type="text" id="stuRoom" placeholder="เช่น ป.6/1" onchange="stuPickRoom(this.value)"></div>
+                <div class="fld"><label for="stuRoomSel">ห้องที่บันทึกไว้</label>
+                  <select id="stuRoomSel" onchange="stuPickRoom(this.value)"></select></div>
+              </div>
+              <div class="fld">
+                <label for="stuNames">รายชื่อนักเรียน — พิมพ์หรือวางทีละบรรทัด (เลขที่ เว้นวรรค ชื่อ ก็ได้)</label>
+                <textarea id="stuNames" rows="8" placeholder="1 ด.ช. สมชาย ใจดี&#10;2 ด.ญ. มานี รักเรียน"></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="stuSaveRoster()">บันทึกรายชื่อ</button>
+              <span class="pkcount" id="stuRosterNote"></span>
+            </div>
+          </div>
+        </div>
+
+        <div id="stu-score" class="stupane" style="display:none">
+          <div class="card mb20">
+            <div class="card-hd"><h3>เลือกชุดข้อสอบที่สอบไปแล้ว</h3></div>
+            <div class="card-bd">
+              <div class="fld"><label for="stuExam">ชุดข้อสอบในคลัง</label>
+                <select id="stuExam" onchange="stuPaintGrid()"></select>
+                <div class="hint">ตารางจะขึ้นให้ติ๊กเฉพาะ “ข้อที่ตอบถูก” — ช่องว่างคือตอบผิด กดหัวข้อเพื่อติ๊กทั้งคอลัมน์ กดชื่อเพื่อติ๊กทั้งแถว</div>
+              </div>
+              <div id="stuGrid"></div>
+              <div class="pkbar mt10">
+                <button class="btn btn-primary" onclick="stuSaveScores()">บันทึกผล</button>
+                <button class="btn btn-ghost btn-sm" onclick="stuAllRight(true)">ติ๊กถูกทั้งตาราง</button>
+                <button class="btn btn-ghost btn-sm" onclick="stuAllRight(false)">ล้างทั้งตาราง</button>
+                <span class="pkcount" id="stuScoreNote"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="stu-map" class="stupane" style="display:none">
+          <div class="card mb20">
+            <div class="card-hd"><h3>ภาพรวมห้อง</h3><span class="chip teal" id="stuMapChip">—</span></div>
+            <div class="card-bd"><div id="stuClass"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-hd"><h3>รายบุคคล</h3>
+              <div class="hdbtns">
+                <select id="stuWho" onchange="stuPaintOne()" style="max-width:220px"></select>
+                <button class="btn btn-ghost btn-sm" onclick="stuPlan()">ให้ AI ร่างแผนพัฒนา</button>
+                <button class="btn btn-ghost btn-sm" onclick="printSheet('stuPaper')">พิมพ์</button>
+              </div>
+            </div>
+            <div class="card-bd">
+              <div class="prog" id="stuProg" style="display:none">
+                <div class="prog-bar"><div class="prog-fill" id="stuProgFill"></div></div>
+                <div class="prog-txt" id="stuProgTxt">กำลังร่างแผน…</div>
+              </div>
+              <div class="paper" id="stuPaper"><div class="empty">ยังไม่มีข้อมูล — บันทึกผลรายข้อในขั้นที่ 2 ก่อน</div></div>
+            </div>
           </div>
         </div>
       </section>
@@ -7022,12 +7247,708 @@ function qaExam(id){
              : EXAM_TYPES.entrance.some(t=>t.id===id) ? 'entrance' : 'tutor';
   examLane(lane); pickExamType(id);
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   BOOK STUDIO — สร้างเอกสาร "เป็นเล่ม"
+   ทำงานสามขั้น: วางโครงเล่มจากหลักสูตร (ไม่เรียก AI) → ครูปรับโครง →
+   สั่งสร้างทีละบทแล้วประกอบเป็นเล่มเดียว พร้อมตรวจคุณภาพก่อนส่งออก
+   ════════════════════════════════════════════════════════════════════ */
+
+const BOOK_TYPES = [
+  {id:'textbook', name:'หนังสือเรียน',        hint:'เนื้อหา + ตัวอย่าง + แบบฝึก', tok:2600,
+   brief:'หนังสือเรียนที่อธิบายแนวคิดจากง่ายไปยาก มีนิยาม สมบัติ ตัวอย่างที่แสดงวิธีคิดทีละขั้น และแบบฝึกท้ายหัวข้อ'},
+  {id:'workbook', name:'หนังสือแบบฝึกหัด',    hint:'เน้นแบบฝึกไล่ระดับ', tok:2400,
+   brief:'หนังสือแบบฝึกหัดที่เนื้อหาสั้นกระชับเป็นกล่องสรุป แล้วให้แบบฝึกไล่ระดับจากง่ายไปยากเป็นชุด ๆ พร้อมเฉลยแสดงวิธีทำ'},
+  {id:'drill',    name:'หนังสือตะลุยโจทย์',   hint:'โจทย์เยอะ เฉลยละเอียด', tok:2600,
+   brief:'หนังสือตะลุยโจทย์ที่เน้นปริมาณโจทย์และเทคนิคการคิดเร็ว แต่ละหัวข้อขึ้นด้วยกล่องเทคนิค แล้วตามด้วยโจทย์พร้อมเฉลยที่ชี้จุดพลิกของข้อ'},
+  {id:'prep',     name:'หนังสือเตรียมสอบ',     hint:'อิงพิมพ์เขียวสนามสอบ', tok:2600,
+   brief:'หนังสือเตรียมสอบที่จัดเนื้อหาตามน้ำหนักของสนามสอบจริง แต่ละบทมีสรุปสิ่งที่ออกสอบ ตัวอย่างข้อสอบแนวเดิม และชุดฝึกจับเวลา'},
+  {id:'summary',  name:'คู่มือสรุปเนื้อหา',    hint:'สรุปสั้น ตารางเยอะ', tok:2000,
+   brief:'คู่มือสรุปเนื้อหาแบบอ่านทบทวนก่อนสอบ ใช้ตาราง แผนภาพ และกล่องสูตรเป็นหลัก ข้อความสั้น ไม่มีการอธิบายยืดยาว'},
+  {id:'remedial', name:'ชุดสอนซ่อมเสริม',      hint:'พื้นฐานอ่อน ค่อย ๆ ไล่', tok:2400,
+   brief:'ชุดสอนซ่อมเสริมสำหรับนักเรียนที่พื้นฐานยังไม่แน่น ต้องรื้อความรู้พื้นฐานก่อน ใช้ขั้นตอนย่อยที่สุด มีตัวช่วยเติมช่องว่างก่อนแล้วค่อยถอดตัวช่วยออก'},
+  {id:'teacher',  name:'คู่มือครู',            hint:'แนวสอน จุดพลาด คำถามชวนคิด', tok:2200,
+   brief:'คู่มือครูที่บอกจุดประสงค์ แนวการจัดกิจกรรม คำถามชวนคิด ความเข้าใจผิดที่นักเรียนมักมี และแนวทางแก้ไข พร้อมข้อเสนอแนะการวัดผล'}
+];
+const BOOK_PARTS = [
+  {id:'cover',  name:'หน้าปกและคำนำ',            on:true},
+  {id:'toc',    name:'สารบัญ',                    on:true},
+  {id:'goal',   name:'จุดประสงค์การเรียนรู้',      on:true},
+  {id:'pre',    name:'แบบทดสอบก่อนเรียน',         on:true},
+  {id:'body',   name:'เนื้อหารายบท',              on:true, lock:true},
+  {id:'post',   name:'แบบทดสอบหลังเรียน',         on:true},
+  {id:'key',    name:'เฉลยรวมท้ายเล่ม',           on:true},
+  {id:'append', name:'ภาคผนวก (สูตรและคำศัพท์)',  on:false}
+];
+let bType = 'textbook';
+let bookOutline = null;      /* {params, chapters:[{topic,tObj,keep,locked,html}]} */
+let bookCurrent = null;
+
+function initBookUI(){
+  document.getElementById('bookTypeGrid').innerHTML = BOOK_TYPES.map(t=>
+    `<button class="dt${t.id===bType?' on':''}" data-bt="${t.id}" onclick="pickBookType('${t.id}')">
+       <span>${esc(t.name)}<small>${esc(t.hint)}</small></span></button>`).join('');
+  fillSel('bGrade', GRADES, 'ป.6');
+  fillSel('bModel', MODELS.map(m=>({v:m.id,t:m.name})), CFG.model);
+  document.getElementById('bPartPick').innerHTML = BOOK_PARTS.map(p=>
+    `<label class="pk"><input type="checkbox" data-bpart="${p.id}"${p.on?' checked':''}${p.lock?' disabled':''}
+      onchange="bDirty()"><span>${esc(p.name)}${p.lock?' (ต้องมีเสมอ)':''}</span></label>`).join('');
+  bOnGrade();
+}
+function pickBookType(id){
+  bType = id;
+  document.querySelectorAll('#bookTypeGrid .dt').forEach(b=>b.classList.toggle('on', b.dataset.bt===id));
+  bDirty();
+}
+function curBookType(){ return BOOK_TYPES.find(t=>t.id===bType) || BOOK_TYPES[0]; }
+function bOnGrade(){
+  const g = document.getElementById('bGrade').value;
+  paintPick('bTopicPick', topicsOf(g).map(t=>t.topic), 'bOnTopic()', false);
+  bOnTopic();
+}
+function bTopicAll(on){
+  const host = document.getElementById('bTopicPick');
+  const all = host && host.querySelector('input[data-pkall]');
+  if(all) all.checked = on;
+  pickAllToggle('bTopicPick', on);
+  bOnTopic();
+}
+function bOnTopic(){
+  pickSyncAll('bTopicPick');
+  const n = pickedSubs('bTopicPick').length;
+  const c = document.getElementById('bTopicCount');
+  if(c) c.textContent = n ? ('เลือกไว้ ' + n + ' บท') : 'ยังไม่ได้เลือกบท';
+  bDirty();
+}
+function bParts(){
+  return Array.from(document.querySelectorAll('#bPartPick input[data-bpart]'))
+    .filter(x=>x.checked || x.disabled).map(x=>x.getAttribute('data-bpart'));
+}
+function bDirty(){
+  const card = document.getElementById('bOutlineCard');
+  if(card && bookOutline){ document.getElementById('bEstNote').textContent = 'ใบสั่งทำเปลี่ยนแล้ว — กดวางโครงเล่มใหม่'; }
+}
+function bookParams(){
+  const g = document.getElementById('bGrade').value;
+  return {
+    btype: bType, grade: g,
+    topics: pickedSubs('bTopicPick'),
+    level: document.getElementById('bLevel').value,
+    ex:   +document.getElementById('bEx').value || 0,
+    drill:+document.getElementById('bDrill').value || 0,
+    parts: bParts(),
+    note: (document.getElementById('bNote').value||'').trim(),
+    model: document.getElementById('bModel').value
+  };
+}
+/* ── ขั้นที่ 1: วางโครงเล่มจากหลักสูตร ไม่เรียก AI ── */
+function bPlan(){
+  const p = bookParams();
+  if(!p.topics.length){ toast('เลือกบทที่จะอยู่ในเล่มก่อน'); return; }
+  const chapters = p.topics.map((name,i)=>{
+    const t = findTopic(p.grade, name);
+    return { n:i+1, topic:name, tObj:t, keep:true, locked:false, html:'' };
+  }).filter(c=>c.tObj);
+  bookOutline = { params:p, chapters:chapters };
+  paintOutline();
+  document.getElementById('bOutlineCard').style.display = '';
+  toast('วางโครงเล่มแล้ว ' + chapters.length + ' บท — ปรับลำดับหรือลบบทได้ก่อนสั่งสร้าง');
+}
+function paintOutline(){
+  if(!bookOutline) return;
+  const p = bookOutline.params, cs = bookOutline.chapters;
+  const partName = id => (BOOK_PARTS.find(x=>x.id===id)||{}).name || id;
+  const front = p.parts.filter(x=>['cover','toc','goal','pre'].indexOf(x)>=0).map(partName);
+  const back  = p.parts.filter(x=>['post','key','append'].indexOf(x)>=0).map(partName);
+  document.getElementById('bOutlineChip').textContent = cs.filter(c=>c.keep).length + ' บท';
+  document.getElementById('bOutline').innerHTML =
+    (front.length ? `<div class="obox">ส่วนหน้าเล่ม: ${esc(front.join(' · '))}</div>` : '') +
+    cs.map((c,i)=>`
+      <div class="orow${c.keep?'':' off'}">
+        <span class="on-n">${i+1}</span>
+        <span class="on-t">${esc(c.topic)}<small>${esc(c.tObj.indicator)} · ${c.tObj.subs.length} หัวข้อย่อย${c.html?' · สร้างแล้ว':''}</small></span>
+        <span class="on-b">
+          <button class="btn btn-ghost btn-sm" onclick="bMove(${i},-1)" title="เลื่อนขึ้น">↑</button>
+          <button class="btn btn-ghost btn-sm" onclick="bMove(${i},1)" title="เลื่อนลง">↓</button>
+          <button class="btn btn-ghost btn-sm" onclick="bLock(${i})" title="ล็อกไม่ให้สร้างทับ">${c.locked?'🔒':'🔓'}</button>
+          <button class="btn btn-ghost btn-sm" onclick="bDrop(${i})" title="เอาออกจากเล่ม">${c.keep?'✕':'↺'}</button>
+        </span>
+      </div>`).join('') +
+    (back.length ? `<div class="obox">ส่วนท้ายเล่ม: ${esc(back.join(' · '))}</div>` : '');
+  const m = modelById(p.model), t = curBookType();
+  const nGen = cs.filter(c=>c.keep && !(c.locked && c.html)).length +
+               (p.parts.indexOf('pre')>=0?1:0) + (p.parts.indexOf('post')>=0?1:0);
+  const est = nGen * (1800/1e6*m.in + t.tok/1e6*m.out);
+  document.getElementById('bEstNote').textContent =
+    'ต้องเรียก AI ' + nGen + ' ครั้ง · ประมาณการ ' + thbFmt(est);
+}
+function bMove(i, d){
+  const cs = bookOutline.chapters, j = i + d;
+  if(j < 0 || j >= cs.length) return;
+  const t = cs[i]; cs[i] = cs[j]; cs[j] = t;
+  paintOutline();
+}
+function bDrop(i){ bookOutline.chapters[i].keep = !bookOutline.chapters[i].keep; paintOutline(); }
+function bLock(i){ bookOutline.chapters[i].locked = !bookOutline.chapters[i].locked; paintOutline(); }
+
+/* ── prompt รายบท ── */
+function chapterPrompt(p, ch, n){
+  const t = ch.tObj, bt = curBookType();
+  return `คุณคือผู้เขียนตำราคณิตศาสตร์ของสำนักพิมพ์ไทยที่แม่นหลักสูตรมาก
+
+กำลังเขียน: ${bt.name} ระดับชั้น ${p.grade}
+${bt.brief}
+
+บทที่ ${n}: ${t.topic}
+รหัสตัวชี้วัด: ${t.indicator}
+ตัวชี้วัดฉบับเต็ม: ${t.ind_text}
+⛔ เพดานความยาก ห้ามเกินเด็ดขาด: ${t.bounds}
+หัวข้อย่อยที่ต้องครอบคลุมให้ครบทุกข้อ:
+${t.subs.map(s=>'  - '+s).join('\n')}
+${bookBlock(p.grade, t.topic, '')}${archeBlock(p.grade, t.topic)}
+${houseStyle(p.grade)}
+
+ระดับความยากของแบบฝึกในบทนี้: ${p.level}
+${p.note ? 'คำสั่งเพิ่มเติมจากครู: '+p.note : ''}
+
+โครงของบทนี้ที่ต้องเขียนตามลำดับ:
+1. <h2>บทที่ ${n} ${t.topic}</h2>
+2. จุดประสงค์การเรียนรู้ของบท เป็นข้อ ๆ 3–5 ข้อ ขึ้นต้นด้วยคำกริยาที่วัดได้
+3. เนื้อหาแยกเป็นหัวข้อย่อยตามรายการข้างบน แต่ละหัวข้อย่อยใช้ <h3> แล้วอธิบายแนวคิดด้วยภาษาที่นักเรียนชั้นนี้อ่านเข้าใจ
+4. ตัวอย่างพร้อมวิธีทำ ${p.ex} ตัวอย่าง แต่ละตัวอย่างขึ้นต้นว่า "ตัวอย่างที่ …" แล้วแสดงวิธีคิดทีละขั้นพร้อมเหตุผลกำกับ
+5. แบบฝึกหัดท้ายบท ${p.drill} ข้อ เรียงจากง่ายไปยาก ใช้ <ol> และเว้นที่ให้เขียนคำตอบด้วยจุดไข่ปลา
+6. สรุปท้ายบทเป็นกล่องสั้น ๆ ไม่เกิน 5 บรรทัด
+7. เฉลยแบบฝึกหัดของบทนี้ทุกข้อ อยู่ในกล่อง <div class="ansbox"> ท้ายสุด พร้อมวิธีทำย่อ
+
+กฎที่ห้ามผิด:
+• ห้ามใช้เนื้อหา สูตร หรือสัญลักษณ์ของระดับชั้นที่สูงกว่าเพดานข้างต้น
+• ตัวเลขในตัวอย่างและแบบฝึกต้องคำนวณลงตัวสวยงาม ตรวจให้ถูกก่อนส่ง
+• เฉลยต้องตรงกับโจทย์ทุกข้อและมีครบทุกข้อ
+• บริบทเป็นบริบทไทย ชื่อคนไทย หน่วยเงินบาท
+• ห้ามคัดลอกข้อความจากหนังสือเรียนเล่มใด ให้เขียนขึ้นใหม่ทั้งหมด
+${HTML_RULES}`;
+}
+function bookTestPrompt(p, which){
+  const names = bookOutline.chapters.filter(c=>c.keep).map(c=>c.topic);
+  const isPre = (which === 'pre');
+  return `คุณคือผู้ออกข้อสอบคณิตศาสตร์ของไทย
+
+กำลังทำ ${isPre ? 'แบบทดสอบก่อนเรียน' : 'แบบทดสอบหลังเรียน'} ของ${curBookType().name} ระดับชั้น ${p.grade}
+บทในเล่มนี้: ${names.join(' · ')}
+
+${isPre
+ ? 'แบบทดสอบก่อนเรียนใช้สำรวจความรู้เดิม จึงต้องวัดความรู้พื้นฐานที่จำเป็นก่อนเรียนบทเหล่านี้เป็นหลัก ไม่ใช่วัดเนื้อหาที่ยังไม่ได้สอน ข้อส่วนใหญ่เป็นระดับง่ายถึงปานกลาง'
+ : 'แบบทดสอบหลังเรียนวัดว่าบรรลุตัวชี้วัดของทุกบทหรือยัง ต้องกระจายให้ครบทุกบทตามสัดส่วนความยาวของบท และมีข้อวัดการนำไปใช้ไม่น้อยกว่าหนึ่งในสาม'}
+
+จำนวน 10 ข้อ ปรนัย 4 ตัวเลือก เขียนเป็น HTML ตามนี้
+• หัวข้อ <h2>${isPre ? 'แบบทดสอบก่อนเรียน' : 'แบบทดสอบหลังเรียน'}</h2>
+• แต่ละข้อเป็น <div class="qitem"><span class="qnum">1.</span> โจทย์ …
+  แล้วตัวเลือกอยู่ใน <div class="qch qch-2"> โดยแต่ละตัวเลือกเป็น <div><span class="chn">ก.</span> <span>…</span></div>
+• ท้ายสุดใส่เฉลยทุกข้อในกล่อง <div class="ansbox"> พร้อมบอกบทที่ข้อนั้นวัด และวิธีทำย่อ
+• ⛔ ห้ามใช้เนื้อหาเกินระดับชั้น ${p.grade} และทุกข้อต้องมีคำตอบถูกเพียงข้อเดียว
+${HTML_RULES}`;
+}
+
+/* ── ขั้นที่ 3: สร้างทั้งเล่ม ── */
+function bookProgress(on, txt, pct, sub){
+  const el = document.getElementById('bookProg');
+  el.style.display = on ? 'block' : 'none';
+  if(on){
+    document.getElementById('bookProgTxt').textContent = txt || 'กำลังสร้าง…';
+    document.getElementById('bookProgFill').style.width = (pct||8)+'%';
+    document.getElementById('bookProgSub').textContent = sub || '';
+  }
+}
+async function bBuild(){
+  if(!bookOutline){ toast('วางโครงเล่มก่อน'); return; }
+  const p = bookOutline.params;
+  const cs = bookOutline.chapters.filter(c=>c.keep);
+  if(!cs.length){ toast('ไม่มีบทเหลืออยู่ในเล่ม'); return; }
+  const jobs = cs.filter(c=>!(c.locked && c.html));
+  const wantPre = p.parts.indexOf('pre')>=0, wantPost = p.parts.indexOf('post')>=0;
+  const total = jobs.length + (wantPre?1:0) + (wantPost?1:0);
+  let done = 0;
+  bookProgress(true, 'กำลังสร้างเล่ม…', 5, 'ทั้งหมด ' + total + ' ส่วน');
+  try{
+    if(wantPre && !bookOutline.pre){
+      bookProgress(true, 'กำลังทำแบบทดสอบก่อนเรียน', 8, '');
+      const r = await callAI(bookTestPrompt(p,'pre'), {model:p.model, maxTok:2600});
+      bookOutline.pre = cleanHTML(r.text); done++;
+    }
+    for(const c of jobs){
+      done++;
+      bookProgress(true, 'กำลังเขียนบท ' + c.topic, 8 + Math.round(done/total*84),
+        'เสร็จแล้ว ' + (done-1) + ' / ' + total + ' ส่วน');
+      const n = cs.indexOf(c) + 1;
+      const r = await callAI(chapterPrompt(p, c, n), {model:p.model, maxTok: curBookType().tok});
+      c.html = cleanHTML(r.text);
+    }
+    if(wantPost){
+      bookProgress(true, 'กำลังทำแบบทดสอบหลังเรียน', 94, '');
+      const r = await callAI(bookTestPrompt(p,'post'), {model:p.model, maxTok:2600});
+      bookOutline.post = cleanHTML(r.text);
+    }
+  }catch(e){
+    bookProgress(false);
+    document.getElementById('bookPaper').innerHTML =
+      `<div class="note err"><b>สร้างเล่มไม่สำเร็จ</b><br>${esc(e.message)}</div>
+       <p class="small mut mt10">บทที่เขียนเสร็จแล้วยังอยู่ในโครงเล่ม กดสร้างใหม่จะทำต่อจากเดิม (ล็อกบทที่เสร็จแล้วไว้เพื่อไม่ให้สร้างทับ)</p>`;
+    paintOutline();
+    return;
+  }
+  bookProgress(false);
+  assembleBook();
+  paintOutline();
+  refreshDash();
+}
+function cleanHTML(t){
+  return String(t||'').replace(/^```[a-z]*\s*/i,'').replace(/```\s*$/,'').trim();
+}
+function assembleBook(){
+  const p = bookOutline.params;
+  const cs = bookOutline.chapters.filter(c=>c.keep && c.html);
+  const bt = curBookType();
+  const title = bt.name + 'คณิตศาสตร์ ชั้น' + p.grade;
+  let h = '';
+  if(p.parts.indexOf('cover')>=0){
+    h += `<div class="bcover"><h1>${esc(title)}</h1>
+      <p class="bcover-sub">${esc([CFG.school, CFG.term].filter(Boolean).join(' · '))}</p>
+      <p class="bcover-sub">${esc(cs.length)} บท · ${esc(p.level)} · ${esc(CFG.teacher ? 'ผู้เรียบเรียง '+CFG.teacher : '')}</p></div>
+      <h2>คำนำ</h2><p>เอกสารเล่มนี้เรียบเรียงขึ้นสำหรับนักเรียนชั้น${esc(p.grade)}
+      ครอบคลุม ${esc(cs.length)} บท ตามตัวชี้วัดของหลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พุทธศักราช 2551 (ฉบับปรับปรุง พ.ศ. 2560)
+      แต่ละบทประกอบด้วยจุดประสงค์การเรียนรู้ เนื้อหา ตัวอย่างพร้อมวิธีทำ แบบฝึกหัด และเฉลย
+      เพื่อให้ผู้เรียนทบทวนด้วยตนเองได้และครูนำไปใช้ประกอบการสอนได้ทันที</p><div class="pgbreak"></div>`;
+  }
+  if(p.parts.indexOf('toc')>=0){
+    h += `<h2>สารบัญ</h2><table><thead><tr><th style="width:60px">บทที่</th><th>เรื่อง</th><th style="width:150px">ตัวชี้วัด</th></tr></thead><tbody>`
+      + cs.map((c,i)=>`<tr><td>${i+1}</td><td>${esc(c.topic)}</td><td>${esc(c.tObj.indicator)}</td></tr>`).join('')
+      + `</tbody></table>`;
+  }
+  if(p.parts.indexOf('goal')>=0){
+    h += `<h2>จุดประสงค์การเรียนรู้ของเล่ม</h2><ul>`
+      + cs.map(c=>`<li><strong>${esc(c.topic)}</strong> — ${esc(c.tObj.ind_text.split('|')[0].trim())}</li>`).join('')
+      + `</ul>`;
+  }
+  if(p.parts.indexOf('pre')>=0 && bookOutline.pre) h += `<div class="pgbreak"></div>` + bookOutline.pre;
+  cs.forEach(c=>{ h += `<div class="pgbreak"></div>` + c.html; });
+  if(p.parts.indexOf('post')>=0 && bookOutline.post) h += `<div class="pgbreak"></div>` + bookOutline.post;
+  if(p.parts.indexOf('append')>=0){
+    h += `<div class="pgbreak"></div><h2>ภาคผนวก — คำศัพท์และสิ่งที่ควรจำ</h2><ul>`
+      + cs.map(c=>`<li><strong>${esc(c.topic)}</strong> — ${esc(c.tObj.subs.slice(0,4).join(' · '))}</li>`).join('')
+      + `</ul>`;
+  }
+  const rec = { kind:'book', key: makeKey('book', {b:p.btype, g:p.grade, t:p.topics.join('|'), l:p.level}),
+    title: title, grade:p.grade, btype:p.btype, html:h, ts:Date.now(), hits:0,
+    meta:{chapters:cs.length, level:p.level} };
+  bookCurrent = rec;
+  BANK.put('book', rec.key, rec);
+  document.getElementById('bookPaper').innerHTML = h;
+  document.getElementById('bookBadge').className = 'chip teal';
+  document.getElementById('bookBadge').textContent = title + ' · ' + cs.length + ' บท';
+  renderMath(document.getElementById('bookPaper'));
+  bCheck();
+}
+/* ── ตรวจคุณภาพเล่ม (ตรวจในเครื่อง ไม่เสียค่า AI) ── */
+function bookAudit(){
+  const out = [];
+  if(!bookOutline) return out;
+  const p = bookOutline.params;
+  const cs = bookOutline.chapters.filter(c=>c.keep);
+  const made = cs.filter(c=>c.html);
+  out.push({ok: made.length===cs.length, t:'เขียนครบทุกบทในเล่ม',
+    d: made.length + ' / ' + cs.length + ' บท'});
+  const noSub = made.filter(c=>{
+    const txt = c.html.replace(/<[^>]+>/g,' ');
+    return c.tObj.subs.filter(s=>txt.indexOf(s.slice(0,12))<0).length > c.tObj.subs.length/2;
+  });
+  out.push({ok: !noSub.length, t:'เนื้อหาครอบคลุมหัวข้อย่อยของตัวชี้วัด',
+    d: noSub.length ? 'ควรตรวจบท: '+noSub.map(c=>c.topic).join(', ') : 'ครบทุกบท'});
+  const noKey = made.filter(c=>c.html.indexOf('ansbox')<0);
+  out.push({ok: !noKey.length, t:'ทุกบทมีเฉลยแนบท้าย',
+    d: noKey.length ? 'ไม่พบเฉลยในบท: '+noKey.map(c=>c.topic).join(', ') : 'มีครบทุกบท'});
+  const short = made.filter(c=>c.html.length < 900);
+  out.push({ok: !short.length, t:'ความยาวของแต่ละบทสมดุลกัน',
+    d: short.length ? 'บทที่สั้นผิดปกติ: '+short.map(c=>c.topic).join(', ') : 'ไม่มีบทที่สั้นผิดปกติ'});
+  const over = made.filter(c=>{
+    const txt = c.html;
+    const nxt = GRADES.slice(GRADES.indexOf(p.grade)+1, GRADES.indexOf(p.grade)+3);
+    return nxt.some(g=>(CURRICULUM[g]||[]).some(t=>/ราก|เลขยกกำลัง|พหุนาม|ตรีโกณ|อนุพันธ์|เมทริกซ์/.test(t.topic) &&
+      new RegExp(t.topic.split(' ')[0]).test(txt)));
+  });
+  out.push({ok: !over.length, t:'ไม่มีเนื้อหาของชั้นที่สูงกว่าปนเข้ามา',
+    d: over.length ? 'ควรตรวจบท: '+over.map(c=>c.topic).join(', ') : 'ไม่พบสัญญาณเนื้อหาเกินชั้น'});
+  const dup = (function(){
+    const seen = {}, hit = [];
+    made.forEach(c=>{
+      (c.html.match(/<li>[\s\S]{15,90}?<\/li>/g)||[]).forEach(x=>{
+        const k = x.replace(/<[^>]+>/g,'').trim().slice(0,45);
+        if(seen[k]) hit.push(k); else seen[k] = 1;
+      });
+    });
+    return hit;
+  })();
+  out.push({ok: dup.length < 3, t:'ไม่มีโจทย์หรือข้อความซ้ำมากเกินไป',
+    d: dup.length ? 'พบข้อความซ้ำ ' + dup.length + ' จุด' : 'ไม่พบการซ้ำ'});
+  if(p.parts.indexOf('pre')>=0) out.push({ok: !!bookOutline.pre, t:'มีแบบทดสอบก่อนเรียน', d: bookOutline.pre?'มี':'ยังไม่ได้สร้าง'});
+  if(p.parts.indexOf('post')>=0) out.push({ok: !!bookOutline.post, t:'มีแบบทดสอบหลังเรียน', d: bookOutline.post?'มี':'ยังไม่ได้สร้าง'});
+  return out;
+}
+function bCheck(){
+  const r = bookAudit();
+  const bad = r.filter(x=>!x.ok).length;
+  document.getElementById('bCheckOut').innerHTML =
+    `<div class="note ${bad?'warn':'info'}"><b>ตรวจคุณภาพเล่ม — ${bad?('มี '+bad+' จุดที่ควรดู'):'ผ่านทุกข้อ'}</b></div>`
+    + `<table class="audit"><tbody>` + r.map(x=>
+      `<tr><td class="a-i">${x.ok?'✓':'!'}</td><td>${esc(x.t)}</td><td class="a-d">${esc(x.d)}</td></tr>`).join('')
+    + `</tbody></table>`;
+}
+function qaBook(id){ go('book'); pickBookType(id); }
+
+/* ════════════════════════════════════════════════════════════════════
+   STUDENT INSIGHT — วิเคราะห์นักเรียนรายบุคคลจากผลสอบ "รายข้อ"
+   หลักการ: AI เสนอ — ครูตรวจ — ครูอนุมัติ — ระบบติดตามผล
+   ระบบไม่ตัดสินเด็กจากข้อเดียว ถ้าหลักฐานน้อยจะบอกว่า "หลักฐานยังไม่พอ"
+   ข้อมูลทั้งหมดเก็บในเครื่อง ไม่ส่งขึ้นคลังกลาง
+   ════════════════════════════════════════════════════════════════════ */
+
+const STU_KEY = 'samath_students_v1';
+const MASTERY = [
+  {id:'none',  name:'ยังไม่มีข้อมูล',        cls:'m0'},
+  {id:'few',   name:'หลักฐานยังไม่พอ',       cls:'m0'},
+  {id:'help',  name:'ต้องช่วยเหลือเร่งด่วน', cls:'m1'},
+  {id:'review',name:'ต้องทบทวน',             cls:'m2'},
+  {id:'dev',   name:'กำลังพัฒนา',            cls:'m3'},
+  {id:'near',  name:'ใกล้รอบรู้',             cls:'m4'},
+  {id:'master',name:'รอบรู้',                cls:'m5'}
+];
+const ERR_KINDS = ['ไม่เข้าใจแนวคิด','ขาดความรู้พื้นฐาน','เลือกวิธีแก้ผิด','ดำเนินการผิดขั้นตอน',
+                   'คำนวณผิด','อ่านโจทย์ผิด','ใช้สัญลักษณ์ผิด','ตอบไม่ครบ','เดาสุ่ม','ยังมีหลักฐานไม่เพียงพอ'];
+const MIN_EVIDENCE = 3;          /* ต่ำกว่านี้ไม่สรุประดับความรอบรู้ */
+
+let STU = {rooms:{}, cur:''};
+function stuLoad(){
+  try{ STU = Object.assign({rooms:{}, cur:''}, JSON.parse(localStorage.getItem(STU_KEY)||'{}')); }
+  catch(e){ STU = {rooms:{}, cur:''}; }
+  return STU;
+}
+function stuSave(){ try{ localStorage.setItem(STU_KEY, JSON.stringify(STU)); }catch(e){} }
+function stuRoom(){ return STU.rooms[STU.cur] || null; }
+
+function initStuUI(){
+  stuLoad();
+  const names = Object.keys(STU.rooms);
+  fillSel('stuRoomSel', names.length ? names : ['— ยังไม่มีห้อง —'], STU.cur);
+  if(STU.cur) document.getElementById('stuRoom').value = STU.cur;
+  stuPaintRoster();
+  stuFillExams();
+}
+function stuTab(id){
+  document.querySelectorAll('.tab[data-stu]').forEach(b=>b.classList.toggle('on', b.dataset.stu===id));
+  ['roster','score','map'].forEach(x=>{
+    const el = document.getElementById('stu-'+x);
+    if(el) el.style.display = (x===id) ? '' : 'none';
+  });
+  if(id==='score'){ stuFillExams(); stuPaintGrid(); }
+  if(id==='map'){ stuPaintClass(); stuPaintOne(); }
+}
+function stuPickRoom(name){
+  name = String(name||'').trim();
+  if(!name || name.indexOf('ยังไม่มีห้อง')>=0) return;
+  STU.cur = name;
+  if(!STU.rooms[name]) STU.rooms[name] = {students:[], results:{}};
+  stuSave();
+  document.getElementById('stuRoom').value = name;
+  fillSel('stuRoomSel', Object.keys(STU.rooms), name);
+  stuPaintRoster();
+}
+function stuPaintRoster(){
+  const r = stuRoom();
+  document.getElementById('stuRoomChip').textContent = STU.cur ? (STU.cur + ' · ' + (r?r.students.length:0) + ' คน') : 'ยังไม่ได้เลือกห้อง';
+  document.getElementById('stuNames').value = r ? r.students.map(s=>s.no + ' ' + s.name).join('\n') : '';
+  const note = document.getElementById('stuRosterNote');
+  if(note) note.textContent = r && r.students.length ? ('บันทึกไว้ ' + r.students.length + ' คน') : '';
+}
+function stuParseNames(txt){
+  return String(txt||'').split('\n').map(x=>x.trim()).filter(Boolean).map((line,i)=>{
+    const m = line.match(/^(\d+)[.)\s]+(.+)$/);
+    return { id:'s'+(i+1), no: m ? +m[1] : (i+1), name: m ? m[2].trim() : line };
+  });
+}
+function stuSaveRoster(){
+  const name = (document.getElementById('stuRoom').value||'').trim();
+  if(!name){ toast('ใส่ชื่อห้องก่อน เช่น ป.6/1'); return; }
+  /* อ่านรายชื่อจากช่องก่อนสลับห้อง เพราะการสลับห้องจะวาดช่องใหม่ทับ */
+  const typed = document.getElementById('stuNames').value;
+  stuPickRoom(name);
+  const r = stuRoom();
+  r.students = stuParseNames(typed);
+  stuSave();
+  stuPaintRoster();
+  toast('บันทึกรายชื่อ ' + r.students.length + ' คนแล้ว');
+}
+/* ── ขั้นที่ 2: บันทึกผลรายข้อ ── */
+function stuExams(){
+  return BANK.all('exam').filter(r => r && r.data && Array.isArray(r.data.items) && r.data.items.length);
+}
+function stuFillExams(){
+  const list = stuExams();
+  fillSel('stuExam', list.length
+    ? list.map(r=>({v:r.key, t:r.title + ' · ' + r.data.items.length + ' ข้อ'}))
+    : [{v:'', t:'— ยังไม่มีชุดข้อสอบในคลัง —'}]);
+}
+function stuCurExam(){
+  const k = document.getElementById('stuExam').value;
+  return stuExams().find(r=>r.key===k) || null;
+}
+function stuPaintGrid(){
+  const host = document.getElementById('stuGrid');
+  const r = stuRoom(), ex = stuCurExam();
+  if(!r || !r.students.length){ host.innerHTML = '<div class="note warn">ยังไม่มีรายชื่อนักเรียน — ทำขั้นที่ 1 ก่อน</div>'; return; }
+  if(!ex){ host.innerHTML = '<div class="note warn">ยังไม่มีชุดข้อสอบในคลัง — สร้างข้อสอบก่อน แล้วผลจะมาให้บันทึกที่นี่</div>'; return; }
+  const items = ex.data.items;
+  const saved = (r.results[ex.key] || {});
+  host.innerHTML =
+    `<div class="gridwrap"><table class="sgrid"><thead><tr><th class="sticky">นักเรียน</th>`
+    + items.map((q,i)=>`<th title="${esc((q.topic||'')+' · '+(q.level||''))}"><button class="colb" onclick="stuCol(${i})">${i+1}</button></th>`).join('')
+    + `<th>ถูก</th></tr></thead><tbody>`
+    + r.students.map(s=>{
+        const row = saved[s.id] || [];
+        return `<tr><td class="sticky"><button class="rowb" onclick="stuRow('${s.id}')">${esc(s.no+' '+s.name)}</button></td>`
+          + items.map((q,i)=>`<td><input type="checkbox" data-sid="${s.id}" data-qi="${i}"${row[i]?' checked':''} onchange="stuCount()"></td>`).join('')
+          + `<td class="scnt" data-cnt="${s.id}">—</td></tr>`;
+      }).join('')
+    + `</tbody></table></div>`;
+  stuCount();
+}
+function stuCol(i){
+  const boxes = Array.from(document.querySelectorAll('#stuGrid input[data-qi="'+i+'"]'));
+  const on = !boxes.every(b=>b.checked);
+  boxes.forEach(b=>b.checked = on);
+  stuCount();
+}
+function stuRow(sid){
+  const boxes = Array.from(document.querySelectorAll('#stuGrid input[data-sid="'+sid+'"]'));
+  const on = !boxes.every(b=>b.checked);
+  boxes.forEach(b=>b.checked = on);
+  stuCount();
+}
+function stuAllRight(on){
+  document.querySelectorAll('#stuGrid input[type=checkbox]').forEach(b=>b.checked = on);
+  stuCount();
+}
+function stuCount(){
+  const r = stuRoom(); if(!r) return;
+  r.students.forEach(s=>{
+    const boxes = Array.from(document.querySelectorAll('#stuGrid input[data-sid="'+s.id+'"]'));
+    const n = boxes.filter(b=>b.checked).length;
+    const cell = document.querySelector('#stuGrid [data-cnt="'+s.id+'"]');
+    if(cell) cell.textContent = boxes.length ? (n + '/' + boxes.length) : '—';
+  });
+}
+function stuSaveScores(){
+  const r = stuRoom(), ex = stuCurExam();
+  if(!r || !ex){ toast('เลือกห้องและชุดข้อสอบก่อน'); return; }
+  const res = {};
+  r.students.forEach(s=>{
+    res[s.id] = Array.from(document.querySelectorAll('#stuGrid input[data-sid="'+s.id+'"]'))
+      .map(b=>b.checked ? 1 : 0);
+  });
+  r.results[ex.key] = res;
+  r.meta = r.meta || {};
+  r.meta[ex.key] = { title: ex.title, ts: Date.now(), n: ex.data.items.length };
+  stuSave();
+  document.getElementById('stuScoreNote').textContent = 'บันทึกแล้วเมื่อ ' + dateFmt(Date.now());
+  toast('บันทึกผลรายข้อของ ' + r.students.length + ' คนแล้ว');
+  stuPaintClass();
+}
+/* ── ขั้นที่ 3: แผนที่ทักษะ ── */
+function skillOf(q){ return (q.skill && String(q.skill).trim()) || q.topic || 'ทักษะทั่วไป'; }
+function stuEvidence(sid){
+  /* คืนรายการหลักฐานทุกข้อของนักเรียนคนนี้ จากทุกชุดข้อสอบที่บันทึกไว้ */
+  const r = stuRoom(); if(!r) return [];
+  const out = [];
+  Object.keys(r.results).forEach(k=>{
+    const ex = stuExams().find(x=>x.key===k); if(!ex) return;
+    const row = r.results[k][sid]; if(!row) return;
+    ex.data.items.forEach((q,i)=>{
+      if(row[i]===undefined) return;
+      out.push({ ok: !!row[i], q:q, i:i, exam: ex.title,
+        skill: skillOf(q), topic: q.topic || '', level: q.level || 'ปานกลาง',
+        trap: q.trap || '' });
+    });
+  });
+  return out;
+}
+function masteryOf(ev){
+  /* คะแนนอธิบายได้: ความถูกต้อง + ถ่วงน้ำหนักความยาก แล้วคุมด้วยกฎหลักฐาน */
+  if(!ev.length) return {id:'none', pct:null, n:0, right:0};
+  const w = {'ง่าย':0.8, 'ปานกลาง':1, 'ยาก':1.3};
+  let num = 0, den = 0, right = 0;
+  ev.forEach(e=>{ const k = w[e.level]||1; den += k; if(e.ok){ num += k; right++; } });
+  const pct = Math.round(num/den*100);
+  if(ev.length < MIN_EVIDENCE) return {id:'few', pct:pct, n:ev.length, right:right};
+  const hardRight = ev.filter(e=>e.ok && e.level!=='ง่าย').length;
+  let id;
+  if(pct >= 85 && hardRight >= 1) id = 'master';
+  else if(pct >= 85)              id = 'near';     /* ถูกแต่ข้อง่าย ยังไม่ถือว่ารอบรู้ */
+  else if(pct >= 70)              id = 'near';
+  else if(pct >= 50)              id = 'dev';
+  else if(pct >= 30)              id = 'review';
+  else                            id = 'help';
+  return {id:id, pct:pct, n:ev.length, right:right};
+}
+function skillMap(sid){
+  const by = {};
+  stuEvidence(sid).forEach(e=>{ (by[e.skill] = by[e.skill]||[]).push(e); });
+  return Object.keys(by).map(s=>{
+    const m = masteryOf(by[s]);
+    return { skill:s, ev:by[s], m:m,
+      topic: (by[s][0]||{}).topic || '',
+      wrong: by[s].filter(e=>!e.ok) };
+  }).sort((a,b)=> (a.m.pct===null?999:a.m.pct) - (b.m.pct===null?999:b.m.pct));
+}
+function mName(id){ return (MASTERY.find(x=>x.id===id)||{}).name || id; }
+function mCls(id){ return (MASTERY.find(x=>x.id===id)||{}).cls || 'm0'; }
+function stuPaintClass(){
+  const host = document.getElementById('stuClass'); if(!host) return;
+  const r = stuRoom();
+  if(!r || !r.students.length){ host.innerHTML = '<div class="note warn">ยังไม่มีรายชื่อนักเรียน</div>'; return; }
+  const rows = r.students.map(s=>({s:s, map:skillMap(s.id)}));
+  const anyData = rows.some(x=>x.map.length);
+  document.getElementById('stuMapChip').textContent = STU.cur + ' · ' + r.students.length + ' คน';
+  fillSel('stuWho', r.students.map(s=>({v:s.id, t:s.no+' '+s.name})));
+  if(!anyData){ host.innerHTML = '<div class="note warn">ยังไม่มีผลสอบที่บันทึกไว้ — ทำขั้นที่ 2 ก่อน</div>'; return; }
+  /* ทักษะที่ทั้งห้องอ่อนที่สุด */
+  const bySkill = {};
+  rows.forEach(x=>x.map.forEach(k=>{
+    const b = bySkill[k.skill] = bySkill[k.skill] || {right:0, n:0, risk:0};
+    b.right += k.ev.filter(e=>e.ok).length; b.n += k.ev.length;
+    if(['help','review'].indexOf(k.m.id)>=0) b.risk++;
+  }));
+  const skills = Object.keys(bySkill).map(s=>({s:s, pct: Math.round(bySkill[s].right/bySkill[s].n*100), risk:bySkill[s].risk}))
+    .sort((a,b)=>a.pct-b.pct);
+  const risky = rows.map(x=>({name:x.s.no+' '+x.s.name,
+      bad: x.map.filter(k=>['help','review'].indexOf(k.m.id)>=0).length,
+      pct: x.map.length ? Math.round(x.map.reduce((a,k)=>a+(k.m.pct||0),0)/x.map.length) : null}))
+    .filter(x=>x.pct!==null).sort((a,b)=>a.pct-b.pct);
+  host.innerHTML =
+    `<h4 class="mb10">ทักษะที่ทั้งห้องควรได้รับการช่วยเหลือก่อน</h4>`
+    + `<table><thead><tr><th>ทักษะ</th><th style="width:130px">ทั้งห้องทำถูก</th><th style="width:150px">คนที่ต้องช่วย</th></tr></thead><tbody>`
+    + skills.slice(0,8).map(k=>`<tr><td>${esc(k.s)}</td>
+        <td><div class="mbar"><i style="width:${k.pct}%"></i></div> ${k.pct}%</td>
+        <td>${k.risk} คน</td></tr>`).join('')
+    + `</tbody></table>`
+    + `<h4 class="mb10 mt20">นักเรียนที่ควรได้รับการช่วยเหลือ</h4>`
+    + `<table><thead><tr><th>นักเรียน</th><th style="width:130px">ค่าเฉลี่ยทักษะ</th><th style="width:150px">ทักษะที่เสี่ยง</th></tr></thead><tbody>`
+    + risky.slice(0,10).map(x=>`<tr><td>${esc(x.name)}</td>
+        <td><div class="mbar"><i style="width:${x.pct}%"></i></div> ${x.pct}%</td><td>${x.bad} ทักษะ</td></tr>`).join('')
+    + `</tbody></table>`;
+}
+function stuPaintOne(){
+  const host = document.getElementById('stuPaper'); if(!host) return;
+  const r = stuRoom(); if(!r || !r.students.length) return;
+  const sid = document.getElementById('stuWho').value || (r.students[0]||{}).id;
+  const s = r.students.find(x=>x.id===sid); if(!s) return;
+  const map = skillMap(sid);
+  if(!map.length){ host.innerHTML = '<div class="empty">ยังไม่มีผลสอบของนักเรียนคนนี้</div>'; return; }
+  const ev = stuEvidence(sid);
+  const overall = Math.round(map.reduce((a,k)=>a+(k.m.pct||0),0)/map.length);
+  host.innerHTML =
+    `<h1>รายงานผลการเรียนรายบุคคล</h1>
+     <div class="docmeta">${esc(s.no+' '+s.name)} · ห้อง ${esc(STU.cur)} · ${esc(CFG.school||'')}
+       <br>หลักฐานที่ใช้ ${ev.length} ข้อ จาก ${Object.keys(r.results).length} ชุดข้อสอบ · ค่าเฉลี่ยทักษะ ${overall}%
+       <br><span class="small">รายงานนี้เป็นข้อมูลประกอบการตัดสินใจของครู ไม่ใช่การตัดสินความสามารถของนักเรียน</span></div>
+     <h2>แผนที่ทักษะ</h2>
+     <table><thead><tr><th>ทักษะ</th><th style="width:80px">ระดับ</th><th style="width:110px">หลักฐาน</th>
+       <th style="width:130px">สถานะ</th><th>ข้อค้นพบ</th></tr></thead><tbody>`
+    + map.map(k=>`<tr>
+        <td>${esc(k.skill)}${k.topic&&k.topic!==k.skill?'<br><span class="small mut">'+esc(k.topic)+'</span>':''}</td>
+        <td>${k.m.pct===null?'—':k.m.pct+'%'}</td>
+        <td>ถูก ${k.m.right}/${k.m.n} ข้อ</td>
+        <td><span class="mtag ${mCls(k.m.id)}">${esc(mName(k.m.id))}</span></td>
+        <td>${esc(stuFinding(k))}</td></tr>`).join('')
+    + `</tbody></table>`
+    + (function(){
+        const wrong = ev.filter(e=>!e.ok && e.trap);
+        if(!wrong.length) return '';
+        return `<h2>ความเข้าใจผิดที่ควรตรวจสอบเพิ่มเติม</h2><ul>`
+          + wrong.slice(0,8).map(e=>`<li><strong>${esc(e.skill)}</strong> — มีแนวโน้มว่า ${esc(String(e.trap).slice(0,140))} <span class="small mut">(จาก ${esc(e.exam)} ข้อ ${e.i+1})</span></li>`).join('')
+          + `</ul><p class="small mut">ข้อความข้างต้นเป็นข้อสันนิษฐานจากตัวลวงที่นักเรียนเลือก ควรถามนักเรียนเพิ่มเติมก่อนสรุป</p>`;
+      })();
+  renderMath(host);
+}
+function stuFinding(k){
+  if(k.m.id==='few')   return 'หลักฐานยังไม่พอ ควรให้ทำเพิ่มอย่างน้อย ' + (MIN_EVIDENCE - k.m.n) + ' ข้อก่อนสรุป';
+  if(k.m.id==='master')return 'ทำได้มั่นคงรวมถึงข้อที่ยากขึ้น';
+  if(k.m.id==='near')  return 'ทำได้เป็นส่วนใหญ่ แต่ยังพลาดในข้อที่ซับซ้อนขึ้น';
+  if(k.m.id==='dev')   return 'ยังไม่สม่ำเสมอ ควรฝึกเพิ่มแบบมีตัวช่วยก่อน';
+  if(k.m.id==='review')return 'ผิดมากกว่าถูก ควรทบทวนแนวคิดหลักใหม่';
+  if(k.m.id==='help')  return 'มีแนวโน้มว่ายังไม่เข้าใจแนวคิด ควรสอนซ่อมตัวต่อตัว';
+  return 'ยังไม่มีข้อมูล';
+}
+/* ── แผนพัฒนา: AI เสนอ ครูตรวจและอนุมัติ ── */
+function planPrompt(s, map, ev){
+  const weak = map.filter(k=>['help','review','dev'].indexOf(k.m.id)>=0).slice(0,3);
+  return `คุณคือครูคณิตศาสตร์ที่มีประสบการณ์สูงในการวางแผนซ่อมเสริมรายบุคคล
+
+นักเรียน: ${s.name} ระดับชั้น ${STU.cur}
+หลักฐานที่มี: ทำข้อสอบไปแล้ว ${ev.length} ข้อ จาก ${new Set(ev.map(e=>e.exam)).size} ชุด
+
+ผลการวิเคราะห์รายทักษะ (เรียงจากอ่อนที่สุด):
+${map.slice(0,6).map(k=>`  - ${k.skill} — ถูก ${k.m.right}/${k.m.n} ข้อ (${k.m.pct}%) สถานะ ${mName(k.m.id)}`).join('\n')}
+
+ข้อที่ตอบผิดและความเข้าใจผิดที่ตัวลวงสะท้อน:
+${ev.filter(e=>!e.ok).slice(0,8).map(e=>`  - ${e.skill}: ${String(e.trap||'ไม่มีข้อมูลตัวลวง').slice(0,120)}`).join('\n') || '  - ไม่มี'}
+
+จงร่างแผนพัฒนา 2 สัปดาห์ที่เน้นเฉพาะ ${weak.length ? weak.map(k=>k.skill).join(' และ ') : 'ทักษะที่อ่อนที่สุดข้างต้น'}
+
+ข้อกำหนดที่ห้ามผิด:
+• ใช้ถ้อยคำว่า "มีแนวโน้ม" หรือ "ควรตรวจสอบเพิ่มเติม" เมื่อหลักฐานยังน้อย ห้ามฟันธงว่านักเรียนไม่เข้าใจจากการตอบผิดเพียงข้อสองข้อ
+• ห้ามตัดสินหรือจัดประเภทตัวนักเรียน ให้พูดถึงทักษะและหลักฐานเท่านั้น
+• กิจกรรมต้องระบุเกณฑ์สำเร็จที่วัดได้จริง และต้องมีการประเมินซ้ำก่อนเลื่อนเป็น "รอบรู้"
+• เนื้อหาทั้งหมดต้องไม่เกินระดับชั้นของนักเรียน
+
+เขียนเป็น HTML ตามโครงนี้
+<h2>แผนพัฒนารายบุคคล</h2>
+<p>เป้าหมาย · ระยะเวลา · สาเหตุที่คาดการณ์ (ใช้คำว่ามีแนวโน้ม) · ความรู้พื้นฐานที่ต้องทบทวน</p>
+<table> ที่มีคอลัมน์ ครั้งที่ / กิจกรรม / สื่อหรือแบบฝึก / เกณฑ์สำเร็จ  จำนวน 5 แถว
+<h3>สิ่งที่ครูควรสังเกตระหว่างสอน</h3> เป็น <ul> 3–4 ข้อ
+<h3>เกณฑ์การเลื่อนสถานะ</h3> บอกชัดว่าต้องผ่านการประเมินซ้ำอย่างไรจึงถือว่ารอบรู้
+${HTML_RULES}`;
+}
+async function stuPlan(){
+  const r = stuRoom(); if(!r){ toast('เลือกห้องก่อน'); return; }
+  const sid = document.getElementById('stuWho').value;
+  const s = r.students.find(x=>x.id===sid);
+  if(!s){ toast('เลือกนักเรียนก่อน'); return; }
+  const map = skillMap(sid), ev = stuEvidence(sid);
+  if(!map.length){ toast('ยังไม่มีผลสอบของนักเรียนคนนี้'); return; }
+  const prog = document.getElementById('stuProg');
+  prog.style.display = 'block';
+  document.getElementById('stuProgFill').style.width = '40%';
+  try{
+    const res = await callAI(planPrompt(s, map, ev), {model: CFG.model, maxTok: 2200});
+    document.getElementById('stuProgFill').style.width = '100%';
+    const host = document.getElementById('stuPaper');
+    host.insertAdjacentHTML('beforeend',
+      `<div class="pgbreak"></div><div class="planbox">${cleanHTML(res.text)}
+       <div class="note info mt10">แผนนี้ AI เป็นผู้เสนอ ครูต้องตรวจและปรับก่อนนำไปใช้ทุกครั้ง</div></div>`);
+    renderMath(host);
+    toast('ร่างแผนพัฒนาแล้ว — ตรวจและปรับก่อนนำไปใช้');
+  }catch(e){
+    toast('ร่างแผนไม่สำเร็จ: ' + e.message);
+  }finally{
+    prog.style.display = 'none';
+    refreshDash();
+  }
+}
+
 /* ════════════════════════════════════════════════════════════════════
    UI SHELL — เส้นทางหน้าจอ, แดชบอร์ด, คลังกลาง, ตั้งค่า, ส่งออก
    ════════════════════════════════════════════════════════════════════ */
 
-const PAGE_TITLE = {dash:'แดชบอร์ด', doc:'สร้างเอกสาร', exam:'สร้างข้อสอบ',
-                    repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
+const PAGE_TITLE = {dash:'หน้าหลัก', book:'สตูดิโอหนังสือ', doc:'สร้างเอกสาร', exam:'สตูดิโอข้อสอบ',
+                    stu:'นักเรียน', repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
 
 function go(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -7037,6 +7958,7 @@ function go(page){
   document.getElementById('crumb').innerHTML = '<b>'+esc(PAGE_TITLE[page]||page)+'</b>';
   document.querySelector('.main').scrollTop = 0;
   if(page==='dash') refreshDash();
+  if(page==='stu')  initStuUI();
   if(page==='repo') renderRepo();
   if(page==='curr') renderCurr();
   if(page==='set')  fillCfgForm();
@@ -7556,7 +8478,10 @@ table{border-collapse:collapse;width:100%;} th,td{border:1px solid #666;padding:
   const blob = new Blob(['\ufeff', html], {type:'application/msword'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  const t = (id==='docPaper' ? (docCurrent&&docCurrent.title) : (examCurrent&&examCurrent.title)) || 'samath';
+  const t = (id==='docPaper'  ? (docCurrent&&docCurrent.title)
+          :  id==='bookPaper' ? (bookCurrent&&bookCurrent.title)
+          :  id==='stuPaper'  ? ('รายงานนักเรียน ' + (STU.cur||''))
+          :  (examCurrent&&examCurrent.title)) || 'samath';
   a.download = t.replace(/[\\/:*?"<>|·\s]+/g,'_').slice(0,60)+'.doc';
   a.click(); URL.revokeObjectURL(a.href);
   toast('บันทึกไฟล์ .doc แล้ว — เปิดด้วย Word ได้เลย');
@@ -7584,6 +8509,8 @@ function startApp(){
   fillSel('cGrade', GRADES, 'ม.1');
   initDocUI();
   initExamUI();
+  initBookUI();
+  stuLoad();
   fillCfgForm();
   go('dash');
   if(BANK.ready()){
@@ -8116,6 +9043,164 @@ ok('ทุกชั้นเปลี่ยนได้โดยไม่ error'
       eOnScope();
     }catch(e){}
   }
+
+
+/* ══ 10. อัตลักษณ์ SAMATH Craft AI ══ */
+ok('ชื่อผลิตภัณฑ์เป็น SAMATH Craft AI', d.title.indexOf('SAMATH Craft AI') === 0);
+ok('แถบข้างใช้โลโก้เป็น SVG ไม่ใช่ตัวอักษร',
+  !!d.querySelector('.rail-glyph svg.scmark') && !!d.querySelector('.gate-glyph svg'));
+ok('เมนูหลักครบทั้งห้าพื้นที่ทำงาน',
+  ['dash','book','doc','exam','stu'].every(x => !!d.querySelector('.rail-btn[data-page="'+x+'"]')));
+ok('ทุกเมนูมีหน้าจอรองรับจริง',
+  ['dash','book','doc','exam','stu','repo','curr','set'].every(x => !!d.getElementById('pg-'+x)));
+ok('ทุกเมนูมีชื่อหน้าในแถบนำทาง',
+  ['dash','book','doc','exam','stu','repo','curr','set'].every(x => !!PAGE_TITLE[x]));
+
+/* ══ 11. สตูดิโอหนังสือ ══ */
+ok('มีประเภทเล่มอย่างน้อย 7 แบบ', BOOK_TYPES.length >= 7);
+BOOK_TYPES.forEach(t => {
+  ok('ประเภทเล่ม ' + t.id + ' มีชื่อ คำใบ้ และคำอธิบายให้ AI',
+    !!t.name && !!t.hint && !!t.brief && t.brief.length > 30);
+  ok('ประเภทเล่ม ' + t.id + ' มีงบโทเคน', t.tok > 1000);
+});
+ok('ส่วนประกอบของเล่มมีเนื้อหารายบทที่ถอดออกไม่ได้',
+  BOOK_PARTS.some(x => x.id === 'body' && x.lock));
+ok('cleanHTML ตัดรั้ว markdown ออก',
+  cleanHTML('```html\n<h2>ก</h2>\n```') === '<h2>ก</h2>');
+(function(){
+  const _t = bType, _g = d.getElementById('bGrade').value;
+  try{
+    initBookUI();
+    d.getElementById('bGrade').value = 'ป.6'; bOnGrade();
+    ok('เลือกชั้นแล้วรายการบทขึ้นครบตามหลักสูตร',
+      pickBoxes('bTopicPick').length === CURRICULUM['ป.6'].length);
+    bTopicAll(true);
+    ok('ปุ่มเลือกทุกบททำงาน', bookParams().topics.length === CURRICULUM['ป.6'].length);
+    bPlan();
+    ok('วางโครงเล่มได้โดยไม่เรียก AI', !!bookOutline && bookOutline.chapters.length > 0);
+    ok('ทุกบทในโครงเล่มผูกกับบทในหลักสูตรจริง', bookOutline.chapters.every(c => !!c.tObj));
+    const first = bookOutline.chapters[0].topic;
+    bMove(0, 1);
+    ok('สลับลำดับบทได้', bookOutline.chapters[1].topic === first);
+    const nKeep = bookOutline.chapters.filter(c=>c.keep).length;
+    bDrop(0);
+    ok('เอาบทออกจากเล่มได้', bookOutline.chapters.filter(c=>c.keep).length === nKeep - 1);
+    bDrop(0);
+    ok('เอาบทกลับเข้าเล่มได้', bookOutline.chapters.filter(c=>c.keep).length === nKeep);
+    bLock(0);
+    ok('ล็อกบทไม่ให้สร้างทับได้', bookOutline.chapters[0].locked === true);
+    bLock(0);
+    const ch = bookOutline.chapters[0];
+    const cp = chapterPrompt(bookOutline.params, ch, 1);
+    ok('prompt รายบทมีเพดานความยากของบทนั้น', cp.indexOf(ch.tObj.bounds) >= 0);
+    ok('prompt รายบทสั่งครอบคลุมหัวข้อย่อยครบ',
+      ch.tObj.subs.every(s => cp.indexOf(s) >= 0));
+    ok('prompt รายบทห้ามคัดลอกจากหนังสือเรียน', cp.indexOf('ห้ามคัดลอกข้อความจากหนังสือเรียน') >= 0);
+    ok('prompt รายบทสั่งให้มีเฉลยของบท', cp.indexOf('ansbox') >= 0);
+    ok('prompt รายบทกำหนดจำนวนตัวอย่างและแบบฝึกตามที่ครูสั่ง',
+      cp.indexOf('ตัวอย่าง') >= 0 && cp.indexOf(String(bookOutline.params.drill)) >= 0);
+    const pre = bookTestPrompt(bookOutline.params, 'pre'), post = bookTestPrompt(bookOutline.params, 'post');
+    ok('แบบทดสอบก่อนเรียนวัดความรู้เดิม ไม่ใช่เนื้อหาที่ยังไม่สอน',
+      pre.indexOf('ความรู้พื้นฐานที่จำเป็นก่อนเรียน') >= 0);
+    ok('แบบทดสอบหลังเรียนกระจายครบทุกบท', post.indexOf('กระจายให้ครบทุกบท') >= 0);
+    /* ประกอบเล่มจากบทจำลอง แล้วตรวจคุณภาพ */
+    bookOutline.chapters.filter(c=>c.keep).forEach(c=>{
+      c.html = '<h2>บท</h2><p>' + c.tObj.subs.join(' ') + '</p><ol><li>ข้อ</li></ol>'
+             + '<div class="ansbox">เฉลย</div>' + new Array(950).join('x');
+    });
+    bookOutline.pre = '<h2>ก่อนเรียน</h2>'; bookOutline.post = '<h2>หลังเรียน</h2>';
+    assembleBook();
+    const bh = d.getElementById('bookPaper').innerHTML;
+    ok('ประกอบเล่มแล้วมีหน้าปกและคำนำ', bh.indexOf('bcover') >= 0 && bh.indexOf('คำนำ') >= 0);
+    ok('ประกอบเล่มแล้วมีสารบัญครบทุกบท',
+      bh.indexOf('สารบัญ') >= 0 &&
+      bookOutline.chapters.filter(c=>c.keep).every(c => bh.indexOf(c.topic) >= 0));
+    ok('เล่มมีแบบทดสอบก่อนและหลังเรียน',
+      bh.indexOf('ก่อนเรียน') >= 0 && bh.indexOf('หลังเรียน') >= 0);
+    ok('เล่มถูกเก็บเข้าคลังให้ใช้ซ้ำ', BANK.count('book') > 0);
+    const a1 = bookAudit();
+    ok('ตรวจคุณภาพเล่มผ่านทุกข้อเมื่อเล่มสมบูรณ์', a1.every(x => x.ok),
+      a1.filter(x=>!x.ok).map(x=>x.t).join(','));
+    bookOutline.chapters.filter(c=>c.keep)[0].html = '<h2>สั้น</h2>';
+    const a2 = bookAudit();
+    ok('ตรวจคุณภาพจับได้เมื่อบทสั้นผิดปกติ',
+      a2.some(x => !x.ok && x.t.indexOf('สมดุล') >= 0));
+    ok('ตรวจคุณภาพจับได้เมื่อบทไม่มีเฉลย',
+      a2.some(x => !x.ok && x.t.indexOf('เฉลย') >= 0));
+  } catch(err){ ok('เทสต์สตูดิโอหนังสือทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally{ try{ pickBookType(_t); d.getElementById('bGrade').value = _g; bOnGrade(); }catch(e){} }
+})();
+
+/* ══ 12. วิเคราะห์นักเรียนรายบุคคล ══ */
+ok('มีระดับความรอบรู้ครบทุกสถานะ', MASTERY.length === 7 &&
+  ['none','few','help','review','dev','near','master'].every(id => MASTERY.some(m => m.id === id)));
+ok('มีการจำแนกสาเหตุของข้อผิดพลาด และมีตัวเลือกว่าหลักฐานไม่พอ',
+  ERR_KINDS.length >= 8 && ERR_KINDS.indexOf('ยังมีหลักฐานไม่เพียงพอ') >= 0);
+ok('เกณฑ์หลักฐานขั้นต่ำอย่างน้อย 3 ข้อ', MIN_EVIDENCE >= 3);
+ok('แยกชื่อกับเลขที่จากรายชื่อที่วางมาได้',
+  (function(){ const r = stuParseNames('1 ด.ช. ก ข\n2) ด.ญ. ค ง\nสมชาย'); 
+    return r.length === 3 && r[0].no === 1 && r[1].name.indexOf('ด.ญ.') === 0 && r[2].no === 3; })());
+(function(){
+  const mk = (n, ok_, lv) => new Array(n).fill(0).map(()=>({ok:ok_, level:lv||'ปานกลาง'}));
+  ok('หลักฐานน้อยกว่าเกณฑ์ ต้องไม่สรุประดับความรอบรู้',
+    masteryOf(mk(2, true)).id === 'few');
+  ok('ไม่มีหลักฐานเลย คืนสถานะยังไม่มีข้อมูล', masteryOf([]).id === 'none');
+  ok('ถูกหมดแต่เป็นข้อง่ายล้วน ยังไม่ถือว่ารอบรู้',
+    masteryOf(mk(5, true, 'ง่าย')).id === 'near');
+  ok('ถูกหมดและมีข้อยากด้วย จึงถือว่ารอบรู้',
+    masteryOf(mk(3, true, 'ง่าย').concat(mk(3, true, 'ยาก'))).id === 'master');
+  ok('ผิดเกือบทั้งหมด ขึ้นสถานะต้องช่วยเหลือเร่งด่วน',
+    masteryOf(mk(5, false)).id === 'help');
+  ok('ถูกครึ่ง ๆ อยู่ในสถานะกำลังพัฒนา',
+    ['dev','review'].indexOf(masteryOf(mk(3, true).concat(mk(3, false))).id) >= 0);
+})();
+(function(){
+  const _cur = STU.cur, _rooms = JSON.parse(JSON.stringify(STU.rooms));
+  try{
+    STU.rooms['__ทดสอบ'] = {students:[{id:'s1', no:1, name:'ทดสอบ ระบบ'}], results:{}};
+    STU.cur = '__ทดสอบ';
+    const items = [0,1,2,3,4,5].map(i => ({ q:'โจทย์ ' + i, choices:['1','2','3','4'], ans:0, explain:'x',
+      skill: i < 3 ? 'บวกเศษส่วน' : 'หารเศษส่วน', topic:'ร้อยละ ป.6',
+      level: i % 3 === 0 ? 'ง่าย' : (i % 3 === 1 ? 'ปานกลาง' : 'ยาก'), trap:'กลับเศษส่วนผิดตัว' }));
+    BANK.put('exam', 'exam___ทดสอบ', { kind:'exam', key:'exam___ทดสอบ', title:'ชุดทดสอบระบบ', ts:Date.now(), hits:0,
+      data:{ params:{grade:'ป.6', etype:'unit', fmt:'mcq4'}, items:items } });
+    STU.rooms['__ทดสอบ'].results['exam___ทดสอบ'] = { s1:[1,1,1,0,0,0] };
+    const ev = stuEvidence('s1');
+    ok('รวบรวมหลักฐานรายข้อของนักเรียนได้ครบ', ev.length === 6);
+    ok('หลักฐานแยกถูกผิดตรงกับที่บันทึก', ev.filter(e=>e.ok).length === 3);
+    const map = skillMap('s1');
+    ok('แผนที่ทักษะแยกตามทักษะที่ข้อนั้นวัด', map.length === 2);
+    ok('แผนที่ทักษะเรียงจากอ่อนที่สุดขึ้นก่อน', map[0].m.pct <= map[1].m.pct);
+    const weak = map.find(k => k.skill === 'หารเศษส่วน');
+    ok('ทักษะที่ผิดหมดถูกจัดเป็นกลุ่มต้องช่วยเหลือ', weak.m.id === 'help', weak.m.id);
+    ok('ทักษะที่ถูกหมดได้สถานะสูงกว่ากลุ่มเสี่ยง',
+      ['master','near'].indexOf(map.find(k=>k.skill==='บวกเศษส่วน').m.id) >= 0);
+    ok('ข้อค้นพบเป็นภาษาที่ครูอ่านเข้าใจ ไม่ใช่ตัวเลขล้วน', stuFinding(weak).length > 10);
+    const pp = planPrompt(STU.rooms['__ทดสอบ'].students[0], map, ev);
+    ok('prompt แผนพัฒนากันการฟันธงเมื่อหลักฐานน้อย', pp.indexOf('มีแนวโน้ม') >= 0);
+    ok('prompt แผนพัฒนาห้ามตัดสินตัวนักเรียน', pp.indexOf('ห้ามตัดสินหรือจัดประเภทตัวนักเรียน') >= 0);
+    ok('prompt แผนพัฒนาบังคับให้มีการประเมินซ้ำก่อนเลื่อนเป็นรอบรู้',
+      pp.indexOf('ประเมินซ้ำ') >= 0);
+    ok('prompt แผนพัฒนาคุมไม่ให้เกินระดับชั้น', pp.indexOf('ไม่เกินระดับชั้น') >= 0);
+    ok('prompt แผนพัฒนาอ้างหลักฐานจริงของนักเรียน', pp.indexOf('หารเศษส่วน') >= 0);
+    stuPaintOne();
+    const rep = d.getElementById('stuPaper').innerHTML;
+    ok('รายงานรายบุคคลแสดงแผนที่ทักษะพร้อมหลักฐาน',
+      rep.indexOf('แผนที่ทักษะ') >= 0 && rep.indexOf('ถูก 3/3 ข้อ') >= 0);
+    ok('รายงานเตือนว่าเป็นข้อมูลประกอบการตัดสินใจของครู',
+      rep.indexOf('ไม่ใช่การตัดสินความสามารถของนักเรียน') >= 0);
+    ok('ความเข้าใจผิดถูกเสนอแบบสันนิษฐาน ไม่ฟันธง',
+      rep.indexOf('มีแนวโน้มว่า') >= 0 && rep.indexOf('ควรถามนักเรียนเพิ่มเติมก่อนสรุป') >= 0);
+    stuPaintClass();
+    const cls = d.getElementById('stuClass').innerHTML;
+    ok('ภาพรวมห้องบอกทักษะที่ควรช่วยก่อนและนักเรียนกลุ่มเสี่ยง',
+      cls.indexOf('ทักษะที่ทั้งห้องควรได้รับการช่วยเหลือก่อน') >= 0 &&
+      cls.indexOf('นักเรียนที่ควรได้รับการช่วยเหลือ') >= 0);
+    ok('ข้อมูลนักเรียนเก็บในเครื่องเท่านั้น ไม่ถูกส่งขึ้นคลังกลาง',
+      BANK.all('doc').concat(BANK.all('exam')).every(r => !r.students && !r.results));
+  } catch(err){ ok('เทสต์วิเคราะห์นักเรียนทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally{ STU.cur = _cur; STU.rooms = _rooms; }
+})();
 
   /* ══ 9. คิวส่งขึ้นชีตอัตโนมัติ ══ */
   const _out = BANK._outLoad().slice(), _ready = BANK.ready;
