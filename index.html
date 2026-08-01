@@ -261,6 +261,23 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .note.warn{background:var(--brasssoft);border-color:#e8d5a8;color:#7d5a12;}
 .note.err{background:var(--stampsoft);border-color:#eec8c3;color:var(--stamp);}
 .sepline{height:1px;background:var(--line);margin:16px 0;}
+/* กล่องติ๊กเลือกหัวข้อย่อยได้หลายเรื่อง */
+.pickbox{border:1px solid var(--line2);border-radius:10px;background:var(--card);max-height:230px;overflow:auto;}
+.pickbox .pk{display:flex;gap:9px;align-items:flex-start;padding:7px 11px;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px;line-height:1.45;}
+.pickbox .pk:last-child{border-bottom:none;}
+.pickbox .pk:hover{background:var(--card2);}
+.pickbox .pk input{margin-top:3px;flex:none;width:15px;height:15px;cursor:pointer;}
+.pickbox .pk.pk-all{background:var(--card2);font-weight:600;position:sticky;top:0;z-index:1;}
+.pickbox .pk.pk-cus{color:var(--teal2);}
+.pickbox.dim{opacity:.5;pointer-events:none;}
+.pkbar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
+.pkbar .pkcount{font-size:12.5px;color:var(--muted);margin-left:auto;}
+/* ป้ายระดับความยากท้ายข้อ */
+.paper .qlv{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;border:1px solid;}
+.paper .qlv-e{color:#2c6e4f;border-color:#9fcbb4;background:#eaf6f0;}
+.paper .qlv-m{color:#8a6314;border-color:#e0c88a;background:#fbf3e2;}
+.paper .qlv-h{color:#9c3b2e;border-color:#e2b0a7;background:#fbeceA;}
+@media print{.paper .qlv{border-color:#999 !important;background:transparent !important;color:#333 !important;}}
 .mut{color:var(--muted);}
 .small{font-size:12.5px;}
 .rt{text-align:right;}
@@ -491,9 +508,15 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   <select id="dTopic" onchange="dOnTopic()"></select>
                 </div>
 
-                <div class="fld">
-                  <label for="dSub">หัวข้อย่อย</label>
-                  <select id="dSub" onchange="dOnSub()"></select>
+                <div class="fld" id="dSubWrap">
+                  <label>หัวข้อย่อย (ติ๊กได้หลายเรื่อง)</label>
+                  <div class="pickbox" id="dSubPick"></div>
+                  <div class="pkbar">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="dSubAll(true)">เลือกทั้งหมด</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="dSubAll(false)">ล้างที่เลือก</button>
+                    <span class="pkcount" id="dSubCount"></span>
+                  </div>
+                  <div class="hint">ไม่ติ๊กเลย = ครอบคลุมทั้งบทตามหลักสูตร · ติ๊กหลายเรื่องได้ ระบบจะเรียงตามลำดับในหลักสูตร</div>
                 </div>
 
                 <div class="fld" id="dCustomWrap" style="display:none">
@@ -560,12 +583,13 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
       <section class="page" id="pg-exam">
         <div class="ph">
           <h1>สร้างข้อสอบ</h1>
-          <p>สองสาย: ใช้ในโรงเรียน (เก็บคะแนน–กลางภาค–ปลายภาค) และสอนพิเศษ (O-NET–TEDET–แข่งขัน) ทุกชุดถูกเก็บเข้าคลังกลางพร้อมตารางวิเคราะห์</p>
+          <p>สามสาย: ใช้ในโรงเรียน (เก็บคะแนน–กลางภาค–ปลายภาค–วัดผลสัมฤทธิ์) · สอนพิเศษ (O-NET–TEDET–แข่งขัน) · สอบเข้า (ม.1–ม.4–มหาวิทยาลัย แยกตามห้องเรียนที่สอบ) ทุกชุดถูกเก็บเข้าคลังกลางพร้อมตารางวิเคราะห์</p>
         </div>
 
         <div class="tabs">
           <button class="tab on" data-lane="school" onclick="examLane('school')">ใช้ในโรงเรียน</button>
           <button class="tab" data-lane="tutor" onclick="examLane('tutor')">สอนพิเศษ / ติวเข้ม</button>
+          <button class="tab" data-lane="entrance" onclick="examLane('entrance')">สอบเข้า</button>
         </div>
 
         <div class="studio">
@@ -592,6 +616,12 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   </div>
                 </div>
 
+                <div class="fld" id="eTierWrap" style="display:none">
+                  <label for="eTier">ห้องเรียนที่สอบ</label>
+                  <select id="eTier" onchange="eOnTier()"></select>
+                  <div class="hint" id="eTierHint"></div>
+                </div>
+
                 <div class="fld" id="eScopeWrap">
                   <label for="eScope">ขอบเขตเนื้อหา</label>
                   <select id="eScope" onchange="eOnScope()"></select>
@@ -599,8 +629,14 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                 </div>
 
                 <div class="fld" id="eSubWrap">
-                  <label for="eSub">หัวข้อย่อย (ไม่บังคับ)</label>
-                  <select id="eSub"></select>
+                  <label>หัวข้อย่อย (ติ๊กได้หลายเรื่อง)</label>
+                  <div class="pickbox" id="eSubPick"></div>
+                  <div class="pkbar">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="eSubAll(true)">เลือกทั้งหมด</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="eSubAll(false)">ล้างที่เลือก</button>
+                    <span class="pkcount" id="eSubCount"></span>
+                  </div>
+                  <div class="hint">ไม่ติ๊กเลย = กระจายทุกหัวข้อย่อยในบท · ติ๊กเฉพาะเรื่องที่ต้องการวัด ระบบจะแบ่งจำนวนข้อให้เท่า ๆ กัน</div>
                 </div>
 
                 <div class="fld">
@@ -631,6 +667,13 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                     <select id="eLayout" onchange="setLayout(this.value)">
                       <option value="compact">ประหยัดกระดาษ (ต่อเนื่อง)</option>
                       <option value="contest">แนวแข่งขัน — 3 ข้อ/หน้า มีที่ให้เขียน</option>
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label for="eShowLv">ป้ายระดับความยาก</label>
+                    <select id="eShowLv" onchange="setShowLevel(this.value)">
+                      <option value="on">แสดงท้ายข้อบนกระดาษข้อสอบ</option>
+                      <option value="off">แสดงเฉพาะในเฉลยและตารางวิเคราะห์</option>
                     </select>
                   </div>
                   <div class="fld">
@@ -2525,8 +2568,14 @@ function bookRef(grade, topic, sub){
     const u = f.unit;
     let p = u.from, nm = '';
     if(sub){
-      const cand = u.secs.filter(x => x.name === sub || x.name.indexOf(sub) >= 0 || sub.indexOf(x.name) >= 0);
-      const s = cand.find(x => x.name === sub) ||
+      /* sub อาจเป็นหลายเรื่องที่ติ๊กมา คั่นด้วย " · " ให้ไล่หาเรื่องแรกที่ตรงกับสารบัญ */
+      const parts = String(sub).split(' · ').map(x=>x.trim()).filter(Boolean);
+      let cand = [];
+      for(const pt of parts){
+        cand = u.secs.filter(x => x.name === pt || x.name.indexOf(pt) >= 0 || pt.indexOf(x.name) >= 0);
+        if(cand.length) break;
+      }
+      const s = cand.find(x => parts.indexOf(x.name) >= 0) ||
                 cand.sort((a,b) => b.name.length - a.name.length)[0];
       if(s){ p = s.p; nm = ' · ' + s.name; }
     }
@@ -2969,6 +3018,143 @@ thai ? `
   return h;
 }
 function hasOnet(grade){ return !!ONET[grade]; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ENTRANCE — สอบเข้า ม.1 / ม.4 / มหาวิทยาลัย
+   ข้อสอบสอบเข้าไม่ได้อยู่ในชั้นเดียว แต่กวาดเนื้อหาของช่วงชั้นก่อนหน้า
+   ทั้งช่วง และความยากขึ้นกับ "ประเภทห้องที่สอบ" มากกว่าตัวชี้วัด
+   โครงสร้างนี้จึงเก็บ 3 อย่าง
+     srcGrades  ชั้นต้นทางพร้อมน้ำหนักจำนวนข้อ
+     tiers      ประเภทห้องเรียนที่สอบ พร้อมสัดส่วนความยากและลักษณะเฉพาะ
+     bp         พิมพ์เขียวจากข้อสอบจริง (ใส่เพิ่มได้เมื่อวิเคราะห์ข้อสอบเก่าแล้ว)
+   ⛔ พิมพ์เขียวเก็บได้เฉพาะโครงสร้าง สัดส่วน และแม่พิมพ์โจทย์
+      ห้ามคัดลอกตัวโจทย์จากหนังสือหรือเอกสารที่มีลิขสิทธิ์ลงในไฟล์นี้
+   ══════════════════════════════════════════════════════════════════════ */
+
+const ENTRANCE = {
+  ent_m1: {
+    label:'สอบเข้า ม.1', target:'ม.1', fmt:'mcq4num', n:30,
+    srcGrades:[{g:'ป.4', w:15},{g:'ป.5', w:35},{g:'ป.6', w:50}],
+    common:'ข้อสอบคัดเลือกเข้าชั้นมัธยมศึกษาปีที่ 1 กวาดเนื้อหาคณิตศาสตร์ ป.4–ป.6 ทั้งช่วงชั้น '
+         + 'เน้นความเร็วและความแม่นยำ โจทย์สั้นแต่ต้องคิดหลายขั้น ข้อส่วนใหญ่เป็นโจทย์ปัญหาที่ผูกสองถึงสามความคิดรวบยอดเข้าด้วยกัน '
+         + 'เช่น ร้อยละกับอัตราส่วน หรือพื้นที่กับปริมาตร ไม่ใช่การถามสูตรตรง ๆ',
+    tiers:[
+      { id:'normal', name:'ห้องเรียนทั่วไป', mix:{e:30,m:50,h:20},
+        brief:'ห้องเรียนปกติ วัดความพร้อมพื้นฐานตามหลักสูตร ป.4–ป.6 ข้อส่วนใหญ่เป็นการนำความรู้ไปใช้หนึ่งถึงสองขั้นตอน '
+             + 'ไม่มีข้อที่ต้องใช้เทคนิคพิเศษหรือความรู้เกินหลักสูตรประถม' },
+      { id:'gifted', name:'ห้องเรียนพิเศษ วิทย์–คณิต (Gifted)', mix:{e:15,m:40,h:45},
+        brief:'ห้องเรียนพิเศษวิทยาศาสตร์–คณิตศาสตร์ ความยากสูงกว่าห้องปกติมาก '
+             + 'มีข้อที่ต้องคิดย้อนกลับ นับอย่างเป็นระบบ มองหาแบบรูป และใช้หลายความคิดรวบยอดในข้อเดียว '
+             + 'แต่ยังใช้ความรู้ระดับประถมเท่านั้น ห้ามใช้สมการหลายตัวแปรหรือสูตรของมัธยม' },
+      { id:'ep', name:'ห้องเรียนพิเศษ EP / IEP', mix:{e:25,m:50,h:25},
+        brief:'ห้องเรียนสองภาษา ความยากใกล้เคียงห้องปกติถึงปานกลางค่อนสูง '
+             + 'เน้นการอ่านโจทย์ที่ยาวขึ้นและศัพท์คณิตศาสตร์ที่ใช้บ่อย ให้เขียนโจทย์เป็นภาษาไทยแต่วงเล็บศัพท์อังกฤษของคำสำคัญไว้ท้ายคำนั้น' }
+    ],
+    bp:{}
+  },
+  ent_m4: {
+    label:'สอบเข้า ม.4', target:'ม.4', fmt:'mcq4num', n:30,
+    srcGrades:[{g:'ม.1', w:25},{g:'ม.2', w:35},{g:'ม.3', w:40}],
+    common:'ข้อสอบคัดเลือกเข้าชั้นมัธยมศึกษาปีที่ 4 กวาดเนื้อหาคณิตศาสตร์ ม.1–ม.3 ทั้งช่วงชั้น '
+         + 'ข้อสอบเน้นพีชคณิต เรขาคณิตที่ต้องลากเส้นเสริม ทฤษฎีจำนวนเบื้องต้น สถิติและความน่าจะเป็น '
+         + 'มีข้อที่ต้องตั้งสมการจากสถานการณ์ และข้อที่ผสมหลายบทในข้อเดียว',
+    tiers:[
+      { id:'normal', name:'ห้องเรียนทั่วไป', mix:{e:25,m:50,h:25},
+        brief:'ห้องเรียนปกติ วัดความพร้อมตามหลักสูตร ม.ต้น ข้อส่วนใหญ่หนึ่งถึงสองขั้นตอน คำนวณลงตัวสวยงาม' },
+      { id:'gifted', name:'ห้องเรียนพิเศษ วิทย์–คณิต (Gifted)', mix:{e:10,m:35,h:55},
+        brief:'ห้องเรียนพิเศษวิทยาศาสตร์–คณิตศาสตร์ ระดับใกล้เคียงข้อสอบแข่งขัน '
+             + 'มีข้อที่ต้องใช้ความคิดริเริ่ม เช่น อสมการ ทฤษฎีจำนวน การนับแบบมีเงื่อนไข และเรขาคณิตที่ต้องสร้างเส้นเสริม '
+             + 'ยังคงใช้ความรู้ไม่เกินหลักสูตร ม.3' },
+      { id:'ep', name:'ห้องเรียนพิเศษ EP / IEP', mix:{e:20,m:50,h:30},
+        brief:'ห้องเรียนสองภาษา ความยากปานกลางค่อนสูง โจทย์ยาวขึ้น เน้นการตีความสถานการณ์ '
+             + 'ให้เขียนโจทย์เป็นภาษาไทยแต่วงเล็บศัพท์อังกฤษของคำสำคัญไว้ท้ายคำนั้น' }
+    ],
+    bp:{}
+  },
+  ent_uni: {
+    label:'สอบเข้ามหาวิทยาลัย', target:'ม.6', fmt:'mcq5', n:25,
+    srcGrades:[{g:'ม.4', w:35},{g:'ม.5', w:35},{g:'ม.6', w:30}],
+    common:'ข้อสอบคัดเลือกเข้ามหาวิทยาลัย กวาดเนื้อหาคณิตศาสตร์ ม.4–ม.6 ทั้งช่วงชั้น '
+         + 'เน้นความเร็ว ความแม่นยำ และการเชื่อมหลายบทเข้าด้วยกันในข้อเดียว '
+         + 'ตัวเลือกลวงต้องมาจากความผิดพลาดที่พบบ่อยจริง เช่น ลืมตรวจเงื่อนไขของคำตอบ ใช้สูตรผิดกรณี หรือคิดเครื่องหมายพลาด',
+    tiers:[
+      { id:'alevel', name:'A-Level คณิตศาสตร์ประยุกต์ 1', mix:{e:20,m:45,h:35},
+        brief:'แนว A-Level คณิตศาสตร์ประยุกต์ 1 ของ ทปอ. ครอบคลุมพีชคณิต ฟังก์ชัน ตรีโกณมิติ เมทริกซ์ เวกเตอร์ '
+             + 'ลำดับอนุกรม แคลคูลัสเบื้องต้น สถิติ และความน่าจะเป็น มีทั้งข้อปรนัยห้าตัวเลือกและข้อเติมคำตอบเป็นตัวเลข' },
+      { id:'alevel2', name:'A-Level คณิตศาสตร์ประยุกต์ 2', mix:{e:35,m:45,h:20},
+        brief:'แนว A-Level คณิตศาสตร์ประยุกต์ 2 (คณิตศาสตร์พื้นฐาน) เนื้อหาแคบกว่าและง่ายกว่าวิชา 1 '
+             + 'เน้นจำนวนจริง เลขยกกำลัง ฟังก์ชันเบื้องต้น ลำดับและอนุกรม ดอกเบี้ยและค่างวด สถิติ และความน่าจะเป็น' },
+      { id:'tgat', name:'ความถนัดเชิงคณิต / เชาวน์เลข', mix:{e:25,m:50,h:25},
+        brief:'แนวข้อสอบความถนัดเชิงคณิตศาสตร์ เน้นการหาแบบรูปของตัวเลขและรูปภาพ การอนุมานเชิงตรรกะ '
+             + 'การอ่านและเปรียบเทียบข้อมูลจากตารางหรือแผนภูมิ และการคิดเลขเร็วโดยใช้การประมาณ '
+             + 'ใช้ความรู้คณิตศาสตร์พื้นฐานเท่านั้น แต่ต้องคิดแบบไม่ตรงไปตรงมา' },
+      { id:'direct', name:'รับตรง / โควตาของคณะ', mix:{e:15,m:40,h:45},
+        brief:'แนวข้อสอบรับตรงของมหาวิทยาลัย ความยากสูงกว่าข้อสอบกลาง มีข้อที่ต้องพิสูจน์หรือให้เหตุผลประกอบ '
+             + 'และข้อที่ผสมหลายบทเข้าด้วยกัน เช่น ตรีโกณมิติกับเรขาคณิตวิเคราะห์ หรือลำดับกับความน่าจะเป็น' }
+    ],
+    bp:{}
+  }
+};
+
+/* ── ตัวช่วยของข้อสอบสอบเข้า ─────────────────────────────────────── */
+function entOf(id){ return ENTRANCE[id] || null; }
+function isEnt(id){ return !!ENTRANCE[id]; }
+function entTier(id, tierId){
+  const e = entOf(id); if(!e) return null;
+  return e.tiers.find(t=>t.id===tierId) || e.tiers[0];
+}
+/* ชั้นต้นทางที่มีอยู่จริงในหลักสูตร พร้อมน้ำหนักที่ปรับให้รวมได้ 100 */
+function entGrades(id){
+  const e = entOf(id); if(!e) return [];
+  const list = e.srcGrades.filter(x => Array.isArray(CURRICULUM[x.g]) && CURRICULUM[x.g].length);
+  const sum = list.reduce((a,x)=>a+x.w, 0) || 1;
+  return list.map(x => ({ g:x.g, w:x.w, pct: x.w/sum }));
+}
+/* พิมพ์เขียวจากข้อสอบจริง ถ้ายังไม่ได้วิเคราะห์จะคืน null แล้วใช้โครงมาตรฐานแทน */
+function entBP(id, tierId){
+  const e = entOf(id); if(!e || !e.bp) return null;
+  return e.bp[tierId] || e.bp['*'] || null;
+}
+function hasEntBP(id, tierId){ return !!entBP(id, tierId); }
+
+function entBlock(id, tierId, grade, topic){
+  const e = entOf(id); if(!e) return '';
+  const tier = entTier(id, tierId);
+  const gs = entGrades(id);
+  let h = `\n【ข้อสอบสอบเข้า — ${e.label} · ${tier.name}】\n${e.common}\n\n【ลักษณะของห้องที่สอบ】\n${tier.brief}`;
+  h += `\n\n【ขอบเขตเนื้อหาของสนามสอบนี้】\n`
+     + gs.map(x => `  ${x.g} — ราว ${Math.round(x.pct*100)}% ของข้อสอบทั้งฉบับ`).join('\n')
+     + `\nข้อที่กำลังออกอยู่นี้มาจากเนื้อหาชั้น ${grade}${topic ? ' บท ' + topic : ''} `
+     + `ให้คุมเนื้อหาไม่ให้เกินเพดานตัวชี้วัดของชั้น ${grade} เด็ดขาด แม้ข้อสอบจะใช้สอบเข้าชั้นที่สูงกว่าก็ตาม`;
+
+  const bp = entBP(id, tierId);
+  if(bp){
+    h += `\n\n【พิมพ์เขียวจากข้อสอบเก่าของสนามนี้ (วิเคราะห์จาก ${bp.total} ข้อ${bp.years ? ' ปี ' + bp.years : ''})】`;
+    const hits = (bp.strands||[]).reduce((a,s)=>a.concat(s.inds||[]), [])
+      .filter(i => i.curr && i.curr.indexOf(topic) >= 0);
+    if(hits.length){
+      h += hits.map(hit =>
+          `\nจุดเน้นที่ตรงกับบทนี้: ${hit.name} — พบในข้อสอบเก่า ${hit.count} ข้อ `
+        + `(${Math.round(hit.count / bp.total * 100)}% ของทั้งฉบับ)`
+        + `\nแม่พิมพ์โจทย์ที่สนามสอบนี้ใช้จริง — ให้ออกโจทย์ "ใหม่" ตามแบบเหล่านี้\n`
+        + (hit.arche||[]).map((x,i)=>`  แบบ ${i+1}. ${x}`).join('\n')).join('\n');
+    } else {
+      h += '\nสัดส่วนที่ข้อสอบจริงให้น้ำหนัก:\n'
+         + (bp.strands||[]).map(s => `  ${s.name} — ${Math.round(s.count/bp.total*100)}%`).join('\n');
+    }
+  } else {
+    h += `\n\n【ยังไม่มีพิมพ์เขียวจากข้อสอบเก่าของสนามนี้】\n`
+       + `ให้ยึดลักษณะของสนามสอบและห้องที่สอบข้างต้นเป็นหลัก และออกโจทย์ตามแม่พิมพ์ของหนังสือเรียนที่แนบมาข้างบน`;
+  }
+
+  h += `\n\n【กติกาเฉพาะของข้อสอบสอบเข้า】
+• โจทย์ต้องคิดได้ในเวลาเฉลี่ยไม่เกินหนึ่งถึงสองนาทีต่อข้อ ตัวเลขต้องคำนวณลงตัวสวยงาม ไม่ใช้เลขที่ต้องกดเครื่องคิดเลข
+• ห้ามใช้เนื้อหาของชั้นที่สูงกว่าชั้นต้นทางของข้อนั้น แม้จะเป็นข้อสอบเข้าชั้นที่สูงกว่าก็ตาม
+• ตัวเลือกลวงต้องมาจากความเข้าใจผิดที่นักเรียนทำจริง ไม่ใช่ตัวเลขสุ่ม และห้ามให้คำตอบถูกอยู่ตำแหน่งเดิมทุกข้อ
+• บริบทเป็นบริบทไทย และเป็นสถานการณ์ที่ผู้เข้าสอบวัยนั้นคุ้นเคย`;
+  return h;
+}
+
 
 /* ══════════════════════════════════════════════════════════════════════
    ACHV — พิมพ์เขียวแบบทดสอบวัดผลสัมฤทธิ์ตามตัวชี้วัด ป.1–ป.6
@@ -4694,7 +4880,7 @@ const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
   key:'', pass:'samath2569', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
-  teacher:'', school:'', term:'', books:{}, layout:'compact'
+  teacher:'', school:'', term:'', books:{}, layout:'compact', showLevel:true
 };
 let CFG = Object.assign({}, CFG_DEF);
 
@@ -5243,8 +5429,9 @@ function pickDocType(id){
   const t = DOC_TYPES.find(x=>x.id===id);
   const gradeScope = t.scope==='grade';
   document.getElementById('dTopic').disabled = gradeScope;
-  document.getElementById('dSub').disabled   = gradeScope;
-  document.getElementById('dCustomWrap').style.display = gradeScope ? 'none' : '';
+  document.getElementById('dSubPick').classList.toggle('dim', gradeScope);
+  document.getElementById('dCustomWrap').style.display =
+    (gradeScope || !pickCustomOn('dSubPick')) ? 'none' : '';
   checkDocCache();
 }
 function fillSel(id, arr, sel){
@@ -5264,13 +5451,56 @@ function dOnGrade(){
 function dOnTopic(){
   const g = document.getElementById('dGrade').value;
   const t = findTopic(g, document.getElementById('dTopic').value);
-  const subs = t ? t.subs.slice() : [];
-  fillSel('dSub', subs.concat(['— ระบุหัวข้อเอง —']));
+  paintPick('dSubPick', t ? t.subs.slice() : [], 'dOnSub()', true);
+  dOnSub();
+}
+/* กล่องติ๊กหัวข้อย่อย — ใช้ร่วมกันทั้งหน้าเอกสารและหน้าข้อสอบ */
+function paintPick(hostId, subs, cb, withCustom){
+  const host = document.getElementById(hostId); if(!host) return;
+  if(!subs.length){
+    host.innerHTML = '<div class="pk" style="color:var(--muted)">บทนี้ไม่มีรายการหัวข้อย่อยแยกไว้</div>';
+    return;
+  }
+  host.innerHTML =
+    `<label class="pk pk-all"><input type="checkbox" data-pkall="1" onchange="pickAllToggle('${hostId}', this.checked); ${cb}"><span>ทุกหัวข้อย่อยในบทนี้</span></label>`
+    + subs.map((s,i)=>`<label class="pk"><input type="checkbox" data-pk="${i}" value="${esc(s)}" onchange="${cb}"><span>${esc(s)}</span></label>`).join('')
+    + (withCustom ? `<label class="pk pk-cus"><input type="checkbox" data-pkcus="1" onchange="${cb}"><span>ระบุหัวข้อเอง</span></label>` : '');
+}
+function pickBoxes(hostId){
+  const host = document.getElementById(hostId);
+  return host ? Array.from(host.querySelectorAll('input[data-pk]')) : [];
+}
+function pickedSubs(hostId){
+  return pickBoxes(hostId).filter(b=>b.checked).map(b=>b.value);
+}
+function pickAllToggle(hostId, on){
+  pickBoxes(hostId).forEach(b=>{ b.checked = on; });
+}
+function pickSyncAll(hostId){
+  const host = document.getElementById(hostId); if(!host) return;
+  const all = host.querySelector('input[data-pkall]');
+  const boxes = pickBoxes(hostId);
+  if(all) all.checked = boxes.length > 0 && boxes.every(b=>b.checked);
+}
+function pickCustomOn(hostId){
+  const host = document.getElementById(hostId); if(!host) return false;
+  const c = host.querySelector('input[data-pkcus]');
+  return !!(c && c.checked);
+}
+function dSubAll(on){
+  const host = document.getElementById('dSubPick');
+  const all = host && host.querySelector('input[data-pkall]');
+  if(all) all.checked = on;
+  pickAllToggle('dSubPick', on);
   dOnSub();
 }
 function dOnSub(){
-  const v = document.getElementById('dSub').value;
-  document.getElementById('dCustomWrap').style.display = (v==='— ระบุหัวข้อเอง —') ? '' : 'none';
+  pickSyncAll('dSubPick');
+  const picked = pickedSubs('dSubPick');
+  const cus = pickCustomOn('dSubPick');
+  document.getElementById('dCustomWrap').style.display = cus ? '' : 'none';
+  const c = document.getElementById('dSubCount');
+  if(c) c.textContent = picked.length ? ('เลือกไว้ ' + picked.length + ' เรื่อง') : 'ยังไม่ได้เลือก = ทั้งบท';
   checkDocCache();
 }
 function docParams(){
@@ -5278,10 +5508,14 @@ function docParams(){
   const g = document.getElementById('dGrade').value;
   const gradeScope = t.scope==='grade';
   const topicName = gradeScope ? '(ทั้งระดับชั้น)' : document.getElementById('dTopic').value;
-  let sub = gradeScope ? '' : document.getElementById('dSub').value;
-  if(sub==='— ระบุหัวข้อเอง —') sub = (document.getElementById('dCustom').value||'').trim();
+  let subs = gradeScope ? [] : pickedSubs('dSubPick');
+  if(!gradeScope && pickCustomOn('dSubPick')){
+    const c = (document.getElementById('dCustom').value||'').trim();
+    if(c) subs = subs.concat([c]);
+  }
+  const sub = subs.join(' · ');
   return {
-    dtype: dType, grade: g, topic: topicName, sub: sub,
+    dtype: dType, grade: g, topic: topicName, sub: sub, subs: subs,
     level: document.getElementById('dLevel').value,
     count: +document.getElementById('dCount').value || 10,
     note: (document.getElementById('dNote').value||'').trim(),
@@ -5325,7 +5559,9 @@ function currContext(grade, topicName, sub){
     `ข้อความตัวชี้วัดฉบับเต็ม: ${t.ind_text}`,
     `⛔ เพดานความยาก ห้ามเกินโดยเด็ดขาด: ${t.bounds}`,
     `สาระการเรียนรู้แกนกลางของบทนี้:\n${t.subs.map(s=>'  - '+s).join('\n')}`,
-    sub ? `หัวข้อย่อยที่ต้องโฟกัส: ${sub}` : '',
+    sub ? (String(sub).indexOf(' · ') > 0
+            ? `หัวข้อย่อยที่ต้องครอบคลุมให้ครบทุกเรื่อง (เฉลี่ยน้ำหนักใกล้เคียงกัน):\n${String(sub).split(' · ').map(s=>'  - '+s).join('\n')}`
+            : `หัวข้อย่อยที่ต้องโฟกัส: ${sub}`) : '',
     bookBlock(grade, t.topic, sub),
     archeBlock(grade, t.topic),
     houseStyle(grade)
@@ -5604,13 +5840,25 @@ const EXAM_TYPES = {
      brief:'ข้อสอบแนวแข่งขันคณิตศาสตร์ระดับประเทศ (สพฐ. / สสวท. / สมาคมคณิตศาสตร์แห่งประเทศไทย) ความยากสูงกว่าข้อสอบในห้องเรียนมาก แต่ยังใช้ความรู้ในระดับชั้นนั้น เน้นความคิดริเริ่ม การใช้หลายแนวคิดร่วมกันในข้อเดียว ทฤษฎีจำนวนเบื้องต้น การนับแบบมีเงื่อนไข อสมการ และเรขาคณิตที่ต้องลากเส้นเสริม เฉลยต้องแสดงแนวคิดหลัก (key idea) ให้ชัดว่าจุดพลิกของข้อนี้อยู่ตรงไหน'},
     {id:'alevel',name:'แนว A-Level', hint:'ม.6 เข้ามหาวิทยาลัย', n:20, scope:'grade',
      brief:'ข้อสอบแนว A-Level คณิตศาสตร์ประยุกต์ 1 (TCAS) ระดับ ม.4–ม.6 เน้นความเร็วและความแม่นยำ ข้อสอบเป็นปรนัยพร้อมตัวเลือกที่เป็นกับดักจากความผิดพลาดที่พบบ่อย และมีข้อแบบเติมคำตอบเป็นตัวเลข ครอบคลุมพีชคณิต ฟังก์ชัน ตรีโกณมิติ เมทริกซ์ ลำดับอนุกรม สถิติ และความน่าจะเป็น'}
-  ]
+  ],
+  /* สายสอบเข้า — สร้างรายการจาก ENTRANCE เพื่อไม่ให้ข้อมูลซ้ำสองที่ */
+  entrance: Object.keys(ENTRANCE).map(id => ({
+    id: id,
+    name: ENTRANCE[id].label,
+    hint: ENTRANCE[id].srcGrades.map(x=>x.g).join(' · ') + ' → ' + ENTRANCE[id].target,
+    n: ENTRANCE[id].n, scope:'grade', fmt: ENTRANCE[id].fmt, ent:true,
+    brief: ENTRANCE[id].common
+  }))
 };
 
 let eLane = 'school';
 let eType = 'unit';
 
 function initExamUI(){
+  const lv = document.getElementById('eShowLv');
+  if(lv) lv.value = (CFG.showLevel === false) ? 'off' : 'on';
+  const ly = document.getElementById('eLayout');
+  if(ly) ly.value = CFG.layout || 'compact';
   fillSel('eGrade', GRADES, 'ม.1');
   fillSel('eModel', MODELS.map(m=>({v:m.id,t:m.name})), CFG.model);
   examLane('school');
@@ -5637,6 +5885,8 @@ function pickExamType(id){
     document.getElementById('eEasy').value=10; document.getElementById('eMed').value=35; document.getElementById('eHard').value=55;
   } else if(t.id==='unit'){
     document.getElementById('eEasy').value=35; document.getElementById('eMed').value=50; document.getElementById('eHard').value=15;
+  } else if(isEnt(t.id)){
+    paintTiers(t.id);
   } else if(t.id==='achv'){
     document.getElementById('eEasy').value=40; document.getElementById('eMed').value=45; document.getElementById('eHard').value=15;
   } else {
@@ -5644,7 +5894,35 @@ function pickExamType(id){
   }
   eOnGrade();
 }
-function curExamType(){ return EXAM_TYPES[eLane].find(t=>t.id===eType) || EXAM_TYPES.school[0]; }
+function curExamType(){
+  const lane = EXAM_TYPES[eLane] || EXAM_TYPES.school;
+  return lane.find(t=>t.id===eType) || lane[0] || EXAM_TYPES.school[0];
+}
+function allExamTypes(){ return EXAM_TYPES.school.concat(EXAM_TYPES.tutor, EXAM_TYPES.entrance); }
+/* หาบทจากทุกชั้น — ใช้ตอนสอบเข้าที่บทมาจากหลายชั้น */
+function findTopicAnyGrade(name){
+  for(const g of GRADES){ const t = findTopic(g, name); if(t) return t; }
+  return null;
+}
+
+/* ── สายสอบเข้า: ห้องเรียนที่สอบ ── */
+function paintTiers(entId){
+  const e = entOf(entId); if(!e) return;
+  const wrap = document.getElementById('eTierWrap');
+  wrap.style.display = '';
+  fillSel('eTier', e.tiers.map(t=>({v:t.id, t:t.name})), e.tiers[0].id);
+  eOnTier();
+}
+function eOnTier(){
+  const t = curExamType(); if(!isEnt(t.id)) return;
+  const tier = entTier(t.id, document.getElementById('eTier').value);
+  document.getElementById('eEasy').value = tier.mix.e;
+  document.getElementById('eMed').value  = tier.mix.m;
+  document.getElementById('eHard').value = tier.mix.h;
+  const hint = document.getElementById('eTierHint');
+  if(hint) hint.textContent = tier.brief.slice(0, 150) + (tier.brief.length > 150 ? '…' : '');
+  checkExamCache();
+}
 
 function eOnGrade(){
   const g = document.getElementById('eGrade').value;
@@ -5660,34 +5938,65 @@ function eOnGrade(){
     const a = achvOf(g);
     document.getElementById('eFormat').value = a ? a.fmt : 'mcq4num';
   }
-  fillSel('eScope', (t.scope==='grade' ? ['ทั้งระดับชั้น (ทุกบท)'] : []).concat(opts));
+  document.getElementById('eTierWrap').style.display = isEnt(t.id) ? '' : 'none';
+  document.getElementById('eGrade').disabled = isEnt(t.id);
+  if(isEnt(t.id)){
+    /* สอบเข้า: ขอบเขตกวาดหลายชั้น ให้เลือกได้ทั้งสนามสอบ หรือเจาะบทเดียวจากชั้นต้นทาง */
+    const e = entOf(t.id);
+    document.getElementById('eFormat').value = e.fmt;
+    /* ชั้นที่แสดงคือชั้นที่จะเข้าเรียน ส่วนเนื้อหามาจากชั้นต้นทางที่กำหนดไว้ในสนามสอบ */
+    const sel = document.getElementById('eGrade');
+    if(Array.from(sel.options).some(o=>o.value===e.target)) sel.value = e.target;
+    const list = ['ทุกชั้นที่ออกสอบ (' + entGrades(t.id).map(x=>x.g).join(' · ') + ')'];
+    entGrades(t.id).forEach(x => topicsOf(x.g).forEach(tp => list.push(tp.topic)));
+    fillSel('eScope', list);
+  } else {
+    fillSel('eScope', (t.scope==='grade' ? ['ทั้งระดับชั้น (ทุกบท)'] : []).concat(opts));
+  }
   eOnScope();
 }
 function eOnScope(){
   const g = document.getElementById('eGrade').value;
   const v = document.getElementById('eScope').value;
   const wrap = document.getElementById('eSubWrap');
-  if(v.indexOf('ทั้งระดับชั้น')===0){ wrap.style.display='none'; }
+  if(v.indexOf('ทั้งระดับชั้น')===0 || v.indexOf('ทุกชั้นที่ออกสอบ')===0){ wrap.style.display='none'; }
   else {
     wrap.style.display='';
-    const t = findTopic(g, v);
-    fillSel('eSub', ['— ทุกหัวข้อย่อยในบทนี้ —'].concat(t?t.subs:[]));
+    const t = findTopic(g, v) || findTopicAnyGrade(v);
+    paintPick('eSubPick', t ? t.subs.slice() : [], 'eOnSub()', false);
   }
+  eOnSub();
+}
+function eSubAll(on){
+  const host = document.getElementById('eSubPick');
+  const all = host && host.querySelector('input[data-pkall]');
+  if(all) all.checked = on;
+  pickAllToggle('eSubPick', on);
+  eOnSub();
+}
+function eOnSub(){
+  pickSyncAll('eSubPick');
+  const c = document.getElementById('eSubCount');
+  const n = pickedSubs('eSubPick').length;
+  if(c) c.textContent = n ? ('เลือกไว้ ' + n + ' เรื่อง') : 'ยังไม่ได้เลือก = ทั้งบท';
   checkExamCache();
 }
 function examParams(){
   const t = curExamType();
   const g = document.getElementById('eGrade').value;
   const scope = document.getElementById('eScope').value;
-  const whole = scope.indexOf('ทั้งระดับชั้น')===0;
-  let sub = whole ? '' : document.getElementById('eSub').value;
-  if(sub==='— ทุกหัวข้อย่อยในบทนี้ —') sub='';
+  const whole = scope.indexOf('ทั้งระดับชั้น')===0 || scope.indexOf('ทุกชั้นที่ออกสอบ')===0;
+  const subs = whole ? [] : pickedSubs('eSubPick');
+  const sub = subs.join(' · ');
   let e = +document.getElementById('eEasy').value||0,
       m = +document.getElementById('eMed').value||0,
       h = +document.getElementById('eHard').value||0;
   const sum = e+m+h || 1;
+  const ent = entOf(t.id);
   return {
-    etype:t.id, lane:eLane, grade:g, whole:whole, topic: whole?'':scope, sub:sub,
+    etype:t.id, lane:eLane, grade: ent ? ent.target : g, whole:whole,
+    topic: whole?'':scope, sub:sub, subs:subs,
+    tier: (document.getElementById('eTier')||{}).value || '',
     count:+document.getElementById('eCount').value||20,
     mix:{ 'ง่าย':e/sum, 'ปานกลาง':m/sum, 'ยาก':h/sum },
     fmt:document.getElementById('eFormat').value,
@@ -5696,7 +6005,7 @@ function examParams(){
   };
 }
 function examKeyOf(p){
-  return makeKey('exam', {e:p.etype,g:p.grade,t:p.topic,s:p.sub,c:p.count,f:p.fmt,
+  return makeKey('exam', {e:p.etype,g:p.grade,t:p.topic,s:p.sub,c:p.count,f:p.fmt,r:p.tier||'',
     m:[p.mix['ง่าย'].toFixed(2),p.mix['ปานกลาง'].toFixed(2),p.mix['ยาก'].toFixed(2)].join('/'),n:p.note});
 }
 
@@ -5737,34 +6046,67 @@ function countPool(p){
 /* ── สร้างพิมพ์เขียวข้อสอบ (Test Blueprint) ── */
 function planBuckets(p){
   const g = p.grade;
-  let topics;
-  if(p.whole){
-    topics = topicsOf(g).slice();
+  /* topics เก็บเป็น {t, g} เสมอ เพราะข้อสอบสอบเข้ากวาดบทจากหลายชั้น */
+  let topics = [];
+  if(isEnt(p.etype)){
+    const gs = entGrades(p.etype);
+    if(p.whole){
+      /* ทั้งสนามสอบ — ถ่วงน้ำหนักจำนวนข้อตามน้ำหนักของแต่ละชั้นต้นทาง */
+      gs.forEach(x => {
+        const list = topicsOf(x.g);
+        const subsIn = list.reduce((a,t)=>a+(t.subs.length||1), 0) || 1;
+        /* หารน้ำหนักชั้นด้วยจำนวนสาระย่อยรวมของชั้นนั้น เพื่อให้ผลรวมข้อของชั้น = สัดส่วนที่กำหนด */
+        list.forEach(t => topics.push({t:t, g:x.g, gw:x.pct/subsIn}));
+      });
+    } else {
+      for(const x of gs){
+        const t = findTopic(x.g, p.topic);
+        if(t){ topics.push({t:t, g:x.g, gw:1}); break; }
+      }
+      if(!topics.length){
+        const t = findTopicAnyGrade(p.topic);
+        if(t){
+          const og = GRADES.find(gg => findTopic(gg, p.topic));
+          topics.push({t:t, g:og || g, gw:1});
+        }
+      }
+    }
+  } else if(p.whole){
+    let list = topicsOf(g).slice();
     /* กลางภาค = ครึ่งแรกของบทเรียน */
-    if(p.etype==='mid') topics = topics.slice(0, Math.max(1, Math.ceil(topics.length/2)));
+    if(p.etype==='mid') list = list.slice(0, Math.max(1, Math.ceil(list.length/2)));
+    topics = list.map(t => ({t:t, g:g, gw:1}));
   } else {
     const t = findTopic(g, p.topic);
-    topics = t ? [t] : topicsOf(g).slice(0,1);
+    topics = (t ? [t] : topicsOf(g).slice(0,1)).map(x => ({t:x, g:g, gw:1}));
   }
   if(!topics.length) return [];
 
-  /* จำนวนข้อต่อบท — ถ่วงน้ำหนักด้วยจำนวนสาระย่อยของบทนั้น */
-  const w = topics.map(t=>t.subs.length||1);
-  const wsum = w.reduce((a,b)=>a+b,0);
-  const per = topics.map((t,i)=>Math.max(1, Math.round(p.count * w[i]/wsum)));
-  /* ปรับให้รวมได้เท่ากับ count พอดี */
-  let diff = p.count - per.reduce((a,b)=>a+b,0);
-  let gi=0;
-  while(diff!==0 && per.length){
-    const i = gi % per.length;
-    if(diff>0){ per[i]++; diff--; } else if(per[i]>1){ per[i]--; diff++; } 
-    gi++;
-    if(gi>500) break;
+  /* จำนวนข้อต่อบท — ถ่วงน้ำหนักด้วยจำนวนสาระย่อยของบท คูณน้ำหนักของชั้นต้นทาง */
+  const w = topics.map(x=>(x.t.subs.length||1) * (x.gw||1));
+  const wsum = w.reduce((a,b)=>a+b,0) || 1;
+  /* ทุกบทควรมีอย่างน้อย 1 ข้อ ถ้าจำนวนข้อพอ — ยกเว้นข้อสอบสอบเข้าที่ต้องคุมสัดส่วนรายชั้นให้ตรง */
+  const minOne = !isEnt(p.etype) && p.count >= topics.length;
+  const exact = topics.map((x,i)=> p.count * w[i]/wsum);
+  const per = exact.map(v => Math.max(minOne?1:0, Math.floor(v)));
+  let left = p.count - per.reduce((a,b)=>a+b,0);
+  /* เศษที่เหลือแจกตามหลักเศษมากได้ก่อน (largest remainder) ไม่ใช่วนแจกเรียงตำแหน่ง */
+  const order = exact.map((v,i)=>({i, frac: v - Math.floor(v)})).sort((a,b)=> b.frac - a.frac);
+  let gi = 0;
+  while(left > 0 && order.length){ per[order[gi % order.length].i]++; left--; gi++; if(gi>2000) break; }
+  gi = 0;
+  const order2 = order.slice().reverse();
+  while(left < 0 && order2.length){
+    const i = order2[gi % order2.length].i;
+    if(per[i] > (minOne?1:0)){ per[i]--; left++; }
+    gi++; if(gi>2000) break;
   }
 
   const levels = ['ง่าย','ปานกลาง','ยาก'];
   const slots = [];
-  topics.forEach((t,i)=>{
+  const wantSubs = Array.isArray(p.subs) ? p.subs.filter(Boolean) : [];
+  topics.forEach((row,i)=>{
+    const t = row.t, tg = row.g;
     const n = per[i];
     const cnt = {};
     let acc=0;
@@ -5775,10 +6117,12 @@ function planBuckets(p){
     });
     levels.forEach(L=>{
       for(let k=0;k<cnt[L];k++){
-        const sub = p.sub || (t.subs.length ? t.subs[(k+levels.indexOf(L)) % t.subs.length] : '');
+        /* ติ๊กหัวข้อย่อยไว้หลายเรื่อง = วนใช้ให้ครบทุกเรื่องอย่างเท่า ๆ กัน */
+        const pool = wantSubs.length ? wantSubs : t.subs;
+        const sub = pool.length ? pool[(k+levels.indexOf(L)) % pool.length] : '';
         slots.push({
-          topic:t.topic, tObj:t, sub:sub, level:L,
-          bucket: BANK.itemKeyOf(g, t.topic, p.sub || '', L)
+          topic:t.topic, tObj:t, sub:sub, level:L, grade:tg,
+          bucket: BANK.itemKeyOf(tg, t.topic, p.sub || '', L)
         });
       }
     });
@@ -5969,6 +6313,8 @@ function chCount(fmt){ return (fmt==='mcq5'||fmt==='mcq5abc') ? 5 : (fmt==='mcq3
 function itemPrompt(p, group, n){
   const t = group.tObj;
   const et = curExamType();
+  /* ข้อสอบสอบเข้ากวาดหลายชั้น แต่ละข้อจึงมีชั้นต้นทางของตัวเอง */
+  const G = group.grade || p.grade;
   const fmtTxt = {
     mcq4:'ปรนัย 4 ตัวเลือก (ก ข ค ง)', mcq5:'ปรนัย 5 ตัวเลือก (1 2 3 4 5)',
     mcq5abc:'ปรนัย 5 ตัวเลือก (A B C D E) แนวข้อสอบแข่งขัน',
@@ -5986,15 +6332,15 @@ function itemPrompt(p, group, n){
 ${et.brief}
 
 ตำแหน่งในหลักสูตร:
-ระดับชั้น: ${p.grade}
+ระดับชั้น: ${G}
 บทเรียน: ${t.topic}
 รหัสตัวชี้วัด: ${t.indicator}
 ตัวชี้วัดฉบับเต็ม: ${t.ind_text}
 ⛔ เพดานความยาก ห้ามเกินเด็ดขาด: ${t.bounds}
 สาระย่อยที่ต้องวัด: ${group.sub || t.subs.join(' / ')}
 
-${bookBlock(p.grade, t.topic, group.sub)}${archeBlock(p.grade, t.topic)}${p.etype==='onet' ? onetBlock(p.grade, t.topic) : ''}${p.etype==='achv' ? achvBlock(p.grade, t.topic) : ''}${figBlock(t)}
-${houseStyle(p.grade)}
+${bookBlock(G, t.topic, group.sub)}${archeBlock(G, t.topic)}${p.etype==='onet' ? onetBlock(G, t.topic) : ''}${p.etype==='achv' ? achvBlock(G, t.topic) : ''}${isEnt(p.etype) ? entBlock(p.etype, p.tier, G, t.topic) : ''}${figBlock(t)}
+${houseStyle(G)}
 
 【กติกาการเขียนตัวเลือก — มีผลกับการจัดหน้ากระดาษโดยตรง】
 • ถ้อยคำที่ซ้ำกันในทุกตัวเลือก ให้ย้ายไปไว้ในคำถาม แล้วเหลือเฉพาะส่วนที่ต่างกันไว้ในตัวเลือก
@@ -6119,6 +6465,9 @@ async function examGenerate(force){
         const i = idxs[k];
         picked[i] = JSON.parse(JSON.stringify(rec.q));
         picked[i]._bankKey = rec.key;
+        /* ข้อจากคลังอาจถูกเก็บไว้ก่อนมีการติดระดับความยากในตัวข้อ ให้เติมจากป้ายของคลัง */
+        if(!picked[i].level) picked[i].level = (rec.meta && rec.meta.level) || s.level;
+        if(!picked[i].topic) picked[i].topic = rec.topic || s.topic;
         used.add(String(rec.q.q).slice(0,45));
         reusedN++;
       });
@@ -6214,7 +6563,11 @@ async function examGenerate(force){
   examProgress(true,'กำลังเรียงข้อและทำตารางวิเคราะห์…',96);
   const rec = {
     kind:'exam', key:key, grade:p.grade, topic:p.topic||'(ทั้งระดับชั้น)', sub:p.sub,
-    dtype:p.etype, title: curExamType().name+' · '+p.grade+(p.topic?' · '+p.topic:''),
+    dtype:p.etype, title: (function(){
+      const e = entOf(p.etype);
+      if(e){ const tr = entTier(p.etype, p.tier); return e.label + ' · ' + (tr?tr.name:'') + (p.topic?' · '+p.topic:''); }
+      return curExamType().name+' · '+p.grade+(p.topic?' · '+p.topic:'');
+    })(),
     data:{ items:items, params:p, reused:reusedN, fresh:newN },
     model:modelUsed, tin:tin, tout:tout,
     meta:{fmt:p.fmt, count:items.length}, ts:Date.now(), hits:0
@@ -6269,6 +6622,20 @@ function chCols(choices){
   }
   return 'qch-1';
 }
+/* ── ป้ายระดับความยากท้ายข้อ ── */
+const LV_CLASS = {'ง่าย':'qlv-e','ปานกลาง':'qlv-m','ยาก':'qlv-h'};
+function lvBadge(level, force){
+  if(!level) return '';
+  if(!force && CFG.showLevel === false) return '';
+  return `<span class="qlv ${LV_CLASS[level]||'qlv-m'}">${esc(level)}</span>`;
+}
+function setShowLevel(v){
+  CFG.showLevel = (v === 'on' || v === true);
+  storeCfg();
+  const cur = window.__lastExam;
+  if(cur) paintExam(cur.rec, cur.opt);
+  toast(CFG.showLevel ? 'แสดงระดับความยากท้ายข้อแล้ว' : 'ซ่อนระดับความยากบนกระดาษข้อสอบแล้ว (เฉลยยังแสดงอยู่)');
+}
 function paintExam(rec, opt){
   opt = opt||{};
   window.__lastExam = {rec:rec, opt:opt};
@@ -6280,18 +6647,24 @@ function paintExam(rec, opt){
            : p.fmt==='mcq3num' ? ['1','2','3']
            :                     ['ก','ข','ค','ง'];
   const layout = CFG.layout==='contest' ? 'contest' : 'compact';
-  const et = (EXAM_TYPES.school.concat(EXAM_TYPES.tutor)).find(x=>x.id===p.etype) || {name:'ข้อสอบ'};
+  const et = allExamTypes().find(x=>x.id===p.etype) || {name:'ข้อสอบ'};
 
   const stamp = opt.reused
     ? `<div class="stampmark">ใช้ซ้ำจากคลังกลาง<small>ประหยัด ${thbFmt(opt.saved||0)} · ครั้งที่ ${(rec.hits||0)+1}</small></div>`
     : (opt.partialReuse ? `<div class="stampmark">คลังช่วย ${opt.partialReuse} ข้อ<small>สร้างใหม่ ${d.fresh} ข้อ</small></div>` : '');
 
   /* หัวกระดาษ */
+  const entC = entOf(p.etype);
+  const tierC = entC ? entTier(p.etype, p.tier) : null;
   let h = stamp + `
-  <h1>${esc(et.name)} วิชาคณิตศาสตร์ ชั้น${esc(p.grade)}</h1>
+  <h1>${entC
+      ? esc('ข้อสอบ' + entC.label + ' วิชาคณิตศาสตร์')
+      : esc(et.name) + ' วิชาคณิตศาสตร์ ชั้น' + esc(p.grade)}</h1>
   <div class="docmeta">
     ${esc([CFG.school, CFG.term].filter(Boolean).join(' · '))}${CFG.school||CFG.term?'<br>':''}
-    ${esc(p.topic ? 'เรื่อง '+p.topic : 'ครอบคลุมทุกหน่วยการเรียนรู้')}${p.sub?' — '+esc(p.sub):''}
+    ${entC
+      ? esc(tierC ? tierC.name : '') + ' · ' + esc(p.topic ? 'เรื่อง '+p.topic : 'เนื้อหา ' + entGrades(p.etype).map(x=>x.g).join(' · '))
+      : esc(p.topic ? 'เรื่อง '+p.topic : 'ครอบคลุมทุกหน่วยการเรียนรู้')}${p.sub?' — '+esc(p.sub):''}
     · จำนวน ${items.length} ข้อ · คะแนนเต็ม ${items.length} คะแนน
     ${CFG.teacher?'<br>ผู้ออกข้อสอบ: '+esc(CFG.teacher):''}
     ${bookRef(p.grade,p.topic,p.sub)?'<br><span class="bookref">อ้างอิง '+esc(bookRef(p.grade,p.topic,p.sub))+'</span>':''}
@@ -6313,7 +6686,7 @@ function paintExam(rec, opt){
     /* เนื้อโจทย์ต้องอยู่ในกล่องเดียว (.qbody) ที่ไหลเป็นข้อความปกติ
        ถ้าเอาโจทย์ไปวางตรง ๆ ในกล่องที่เป็น flex ทุกสูตรจะกลายเป็นบล็อกแยกบรรทัด */
     let b = `<div class="qitem${contest?' qcontest':''}"><div class="qbody">`
-          + `<span class="qnum">${i+1}.</span> ${q.q}`
+          + `<span class="qnum">${i+1}.</span> ${q.q}${lvBadge(q.level)}`
           + figSVG(q.fig);
     if(Array.isArray(q.choices)){
       b += `<div class="qch ${chCols(q.choices)}">`
@@ -6346,13 +6719,17 @@ function paintExam(rec, opt){
   /* ── เฉลย ── */
   let key = `<div id="examKeyBlock">${layout==='contest'?'<div class="pgbreak"></div>':'<hr>'}<h2>เฉลยและแนวการให้คะแนน</h2>`;
   if(Array.isArray(items[0]&&items[0].choices)){
-    key += `<p><strong>ตารางคำตอบ</strong></p><table><tr>` +
-      items.map((q,i)=>`<th>${i+1}</th>`).join('') + `</tr><tr>` +
-      items.map(q=>`<td>${Array.isArray(q.choices)?(LT[q.ans]||'-'):esc(q.answer||'-')}</td>`).join('') + `</tr></table>`;
+    key += `<p><strong>ตารางคำตอบ</strong></p><table><tr><th>ข้อ</th>` +
+      items.map((q,i)=>`<th>${i+1}</th>`).join('') + `</tr><tr><td>ตอบ</td>` +
+      items.map(q=>`<td>${Array.isArray(q.choices)?(LT[q.ans]||'-'):esc(q.answer||'-')}</td>`).join('') +
+      `</tr><tr><td>ระดับ</td>` +
+      items.map(q=>`<td>${({'ง่าย':'ง','ปานกลาง':'ป','ยาก':'ย'})[q.level]||'-'}</td>`).join('') +
+      `</tr></table><p class="small mut">ระดับความยาก: ง = ง่าย · ป = ปานกลาง · ย = ยาก</p>`;
   }
   items.forEach((q,i)=>{
     const ansTxt = Array.isArray(q.choices) ? `${LT[q.ans]}. ${q.choices[q.ans]}` : esc(q.answer||'');
-    key += `<div class="ansbox"><strong>ข้อ ${i+1}</strong> — ตอบ ${ansTxt}<br>
+    key += `<div class="ansbox"><strong>ข้อ ${i+1}</strong>${lvBadge(q.level, true)} — ตอบ ${ansTxt}`
+      + `${q.topic?`<br><span class="small mut">${esc(q.topic)}${q.sub?' · '+esc(q.sub):''}</span>`:''}<br>
       ${q.explain||''}
       ${q.trap?`<br><em>จุดพลาดที่พบบ่อย:</em> ${q.trap}`:''}</div>`;
   });
@@ -6369,7 +6746,7 @@ function paintExam(rec, opt){
     <table><thead><tr><th>หน่วย / บทเรียน</th><th>ตัวชี้วัด</th><th>ง่าย</th><th>ปานกลาง</th><th>ยาก</th><th>รวม</th></tr></thead><tbody>`;
   Object.keys(byTopic).forEach(t=>{
     const o = byTopic[t];
-    const tp = findTopic(p.grade, t);
+    const tp = findTopic(p.grade, t) || findTopicAnyGrade(t);
     const tot = o['ง่าย'].length+o['ปานกลาง'].length+o['ยาก'].length;
     key += `<tr><td>${esc(t)}</td><td>${esc(tp?tp.indicator:'—')}</td>
       <td>${o['ง่าย'].join(', ')||'-'}</td><td>${o['ปานกลาง'].join(', ')||'-'}</td>
@@ -6403,7 +6780,8 @@ function toggleKey(){
 }
 function qaExam(id){
   go('exam');
-  const lane = EXAM_TYPES.school.some(t=>t.id===id) ? 'school' : 'tutor';
+  const lane = EXAM_TYPES.school.some(t=>t.id===id) ? 'school'
+             : EXAM_TYPES.entrance.some(t=>t.id===id) ? 'entrance' : 'tutor';
   examLane(lane); pickExamType(id);
 }
 /* ════════════════════════════════════════════════════════════════════
@@ -7161,6 +7539,58 @@ ok('achvBlock บังคับให้ทุกข้อมีตัวเล
   achvBlock('ป.1', 'จำนวนนับ 1–100 และ 0').indexOf('ตัวเลือกที่ถูกต้องอยู่จริงเพียงตัวเดียว') >= 0);
 ok('achvBlock กำกับรหัสตัวชี้วัดท้ายข้อ', achvBlock('ป.3', '').indexOf('วงเล็บรหัสตัวชี้วัด') >= 0);
 ok('ชั้นที่ไม่มีพิมพ์เขียวสัมฤทธิ์คืนแผนว่าง', achvPlan('ม.2', 20).length === 0);
+
+/* ══ 4ค. สนามสอบเข้า ม.1 / ม.4 / มหาวิทยาลัย ══ */
+const ENT_IDS = Object.keys(ENTRANCE);
+ok('มีสนามสอบเข้าครบสามระดับ',
+  ENT_IDS.length === 3 && ENT_IDS.every(isEnt) && ['ent_m1','ent_m4','ent_uni'].every(id => !!ENTRANCE[id]));
+ENT_IDS.forEach(id => {
+  const e = entOf(id);
+  ok('[' + id + '] มีชื่อ ชั้นเป้าหมาย และรูปแบบข้อ',
+    !!e.label && GRADES.indexOf(e.target) >= 0 && !!e.fmt);
+  ok('[' + id + '] ชั้นต้นทางมีอยู่จริงในหลักสูตรทุกชั้น',
+    e.srcGrades.every(x => Array.isArray(CURRICULUM[x.g]) && CURRICULUM[x.g].length),
+    e.srcGrades.map(x=>x.g).join(','));
+  /* สอบเข้ามหาวิทยาลัยสอบตอนอยู่ ม.6 จึงกวาดถึงชั้นเดียวกับเป้าหมายได้ */
+  ok('[' + id + '] ชั้นต้นทางไม่สูงกว่าชั้นเป้าหมาย',
+    e.srcGrades.every(x => GRADES.indexOf(x.g) <= GRADES.indexOf(e.target)));
+  ok('[' + id + '] น้ำหนักชั้นต้นทางรวมได้ 100%',
+    Math.abs(entGrades(id).reduce((a,x)=>a+x.pct, 0) - 1) < 1e-9);
+  ok('[' + id + '] มีห้องเรียนให้เลือกอย่างน้อยสองแบบ', e.tiers.length >= 2);
+  e.tiers.forEach(t => {
+    ok('[' + id + '/' + t.id + '] สัดส่วนความยากรวมได้ 100', t.mix.e + t.mix.m + t.mix.h === 100,
+      (t.mix.e + t.mix.m + t.mix.h) + '');
+    ok('[' + id + '/' + t.id + '] มีคำอธิบายห้องให้ AI', !!t.brief && t.brief.length > 40);
+  });
+  ok('[' + id + '] entTier คืนห้องแรกเมื่อส่งค่าที่ไม่มีจริง',
+    entTier(id, 'ไม่มีห้องนี้').id === e.tiers[0].id);
+  /* ยังไม่ได้วิเคราะห์ข้อสอบเก่า → ต้องไม่มีพิมพ์เขียวหลอก แต่บล็อกคำสั่งต้องยังใช้ได้ */
+  const blk = entBlock(id, e.tiers[0].id, e.srcGrades[0].g, '');
+  ok('[' + id + '] entBlock ระบุสนามสอบและห้องที่สอบ',
+    blk.indexOf(e.label) >= 0 && blk.indexOf(e.tiers[0].name) >= 0);
+  ok('[' + id + '] entBlock เตือนห้ามใช้เนื้อหาเกินชั้นต้นทาง',
+    blk.indexOf('ห้ามใช้เนื้อหาของชั้นที่สูงกว่า') >= 0);
+  ok('[' + id + '] entBlock บอกสัดส่วนของทุกชั้นต้นทาง',
+    e.srcGrades.every(x => blk.indexOf(x.g + ' —') >= 0));
+});
+ok('ยังไม่มีพิมพ์เขียวจากข้อสอบเก่าของสนามสอบเข้า (รอไฟล์ข้อสอบ)',
+  ENT_IDS.every(id => entOf(id).tiers.every(t => !hasEntBP(id, t.id))));
+ok('entBlock บอกตรง ๆ เมื่อยังไม่มีพิมพ์เขียว',
+  entBlock('ent_m1', 'normal', 'ป.6', '').indexOf('ยังไม่มีพิมพ์เขียวจากข้อสอบเก่า') >= 0);
+ok('สนามสอบที่ไม่มีอยู่คืนค่าว่างอย่างปลอดภัย',
+  entOf('ไม่มี') === null && entBlock('ไม่มี', 'x', 'ป.6', '') === '' && entGrades('ไม่มี').length === 0);
+/* เมื่อใส่พิมพ์เขียวในอนาคต ต้องถูกหยิบมาใช้แทนข้อความรอ */
+(function(){
+  const e = entOf('ent_m1');
+  e.bp['normal'] = { total: 100, years:'ทดสอบ', strands:[
+    { name:'ทดสอบ', count:100, inds:[{ name:'ทดสอบ', count:100, curr:['ร้อยละ ป.6'], arche:['แม่พิมพ์ทดสอบ'] }] }] };
+  const b = entBlock('ent_m1', 'normal', 'ป.6', 'ร้อยละ ป.6');
+  ok('พร้อมรับพิมพ์เขียวจากข้อสอบเก่าเมื่อวิเคราะห์แล้ว',
+    b.indexOf('พิมพ์เขียวจากข้อสอบเก่า') >= 0 && b.indexOf('แม่พิมพ์ทดสอบ') >= 0);
+  delete e.bp['normal'];
+  ok('ลบพิมพ์เขียวทดสอบออกแล้ว', !hasEntBP('ent_m1', 'normal'));
+})();
+ok('findTopicAnyGrade หาบทข้ามชั้นได้', !!findTopicAnyGrade('ร้อยละ ป.6') && !findTopicAnyGrade('บทที่ไม่มีจริง'));
 const ipAchv = itemPrompt({ grade: 'ป.1', fmt: 'mcq3num', note: '', etype: 'achv' },
   { tObj: findTopic('ป.1', 'การบวกและการลบจำนวนนับ 1–100'), sub: '', level: 'ง่าย' }, 4);
 ok('prompt วัดผลสัมฤทธิ์ ป.1 ฝังพิมพ์เขียว', ipAchv.indexOf('พิมพ์เขียวแบบทดสอบวัดผลสัมฤทธิ์') >= 0);
@@ -7279,6 +7709,113 @@ ok('ป.4 วัดผลสัมฤทธิ์ตั้ง 4 ตัวเล�
 ok('ม.2 วัดผลสัมฤทธิ์ (ไม่มีพิมพ์เขียว) ใช้ค่าเริ่มต้นตัวเลข', pickS('ม.2','achv')==='mcq4num');
 ok('ทุกชั้นเลือกวัดผลสัมฤทธิ์ได้โดยไม่ error',
   GRADES.every(g=>{ try{ pickS(g,'achv'); return true; }catch(e){ return false; } }));
+
+/* ── สายสอบเข้า บนหน้าจอ ── */
+examLane('entrance');
+ok('มีแท็บสอบเข้าและมีรายการครบ', EXAM_TYPES.entrance.length === 3);
+ok('เลือกสายสอบเข้าแล้วช่องห้องเรียนโผล่ขึ้นมา',
+  d.getElementById('eTierWrap').style.display !== 'none');
+ok('ช่องระดับชั้นถูกล็อกในสายสอบเข้า', d.getElementById('eGrade').disabled === true);
+ENT_IDS.forEach(id => {
+  pickExamType(id);
+  const e = entOf(id);
+  ok('[' + id + '] ตั้งรูปแบบข้อตามสนามสอบ', d.getElementById('eFormat').value === e.fmt);
+  ok('[' + id + '] รายการห้องเรียนถูกเติมครบ',
+    d.getElementById('eTier').options.length === e.tiers.length);
+  ok('[' + id + '] ขอบเขตเนื้อหามีตัวเลือกรวมทุกชั้น + บทของทุกชั้นต้นทาง',
+    d.getElementById('eScope').options.length ===
+      1 + entGrades(id).reduce((a,x)=>a+topicsOf(x.g).length, 0));
+  e.tiers.forEach(t => {
+    d.getElementById('eTier').value = t.id; eOnTier();
+    ok('[' + id + '/' + t.id + '] เลือกห้องแล้วสัดส่วนความยากเปลี่ยนตาม',
+      +d.getElementById('eEasy').value === t.mix.e &&
+      +d.getElementById('eMed').value === t.mix.m &&
+      +d.getElementById('eHard').value === t.mix.h);
+  });
+  d.getElementById('eTier').value = e.tiers[0].id; eOnTier();
+  const pe = examParams();
+  ok('[' + id + '] ชั้นในใบสั่งงานคือชั้นที่จะเข้าเรียน', pe.grade === e.target);
+  ok('[' + id + '] เก็บห้องที่สอบไว้ในใบสั่งงาน', pe.tier === e.tiers[0].id);
+  const sl = planBuckets(pe);
+  ok('[' + id + '] จำนวนข้อที่วางแผนได้ตรงกับที่สั่ง', sl.length === pe.count, 'ได้ ' + sl.length);
+  ok('[' + id + '] ข้อกระจายครบทุกชั้นต้นทาง',
+    entGrades(id).every(x => sl.some(s => s.grade === x.g)),
+    [...new Set(sl.map(s=>s.grade))].join(','));
+  ok('[' + id + '] สัดส่วนข้อรายชั้นใกล้เคียงน้ำหนักที่กำหนด (คลาดได้ไม่เกิน 3 ข้อ)',
+    entGrades(id).every(x => Math.abs(sl.filter(s=>s.grade===x.g).length - x.pct*pe.count) <= 3),
+    entGrades(id).map(x => x.g + ':' + sl.filter(s=>s.grade===x.g).length).join(' '));
+  ok('[' + id + '] คลังรายข้อแยกตามชั้นต้นทาง ไม่ปนกับชั้นที่จะเข้าเรียน',
+    sl.every(s => s.bucket.indexOf(s.grade) >= 0));
+  const ip = itemPrompt(pe, sl[0], 3);
+  ok('[' + id + '] prompt ใช้ชั้นต้นทางของข้อนั้น ไม่ใช่ชั้นที่จะเข้าเรียน',
+    ip.indexOf('ระดับชั้น: ' + sl[0].grade) >= 0);
+  ok('[' + id + '] prompt มีเพดานความยากของชั้นต้นทาง', ip.indexOf(sl[0].tObj.bounds) >= 0);
+  ok('[' + id + '] prompt มีบล็อกสนามสอบเข้า', ip.indexOf(e.label) >= 0);
+});
+/* ข้อสอบประเภทอื่นต้องไม่มีบล็อกสอบเข้าปนเข้าไป */
+examLane('school'); pickExamType('unit');
+const ipPlain = itemPrompt({ grade:'ป.6', fmt:'mcq4', note:'', etype:'unit' },
+  { tObj: findTopic('ป.6','ร้อยละ ป.6'), sub:'', level:'ง่าย' }, 3);
+ok('ข้อสอบในโรงเรียนไม่ถูกใส่บล็อกสอบเข้า', ipPlain.indexOf('ข้อสอบสอบเข้า —') < 0);
+
+/* ── กล่องติ๊กหัวข้อย่อย ── */
+examLane('school'); d.getElementById('eGrade').value = 'ม.1'; pickExamType('unit');
+d.getElementById('eScope').selectedIndex = 0; eOnScope();
+const nBox = pickBoxes('eSubPick').length;
+ok('กล่องติ๊กหัวข้อย่อยของข้อสอบถูกสร้างตามบทที่เลือก', nBox > 0, 'ได้ ' + nBox);
+ok('ยังไม่ติ๊ก = ไม่มีหัวข้อย่อยเจาะจง', pickedSubs('eSubPick').length === 0 && examParams().sub === '');
+if(nBox >= 2){
+  pickBoxes('eSubPick')[0].checked = true;
+  pickBoxes('eSubPick')[1].checked = true;
+  eOnSub();
+  const pp = examParams();
+  ok('ติ๊กสองเรื่องแล้วใบสั่งงานเก็บครบสองเรื่อง', pp.subs.length === 2 && pp.sub.indexOf(' · ') > 0);
+  const sl2 = planBuckets(pp);
+  ok('ข้อถูกกระจายให้ครบทุกเรื่องที่ติ๊ก',
+    [...new Set(sl2.map(s=>s.sub))].length === 2,
+    [...new Set(sl2.map(s=>s.sub))].length + '');
+  ok('ติ๊กคนละชุดได้กุญแจคลังคนละอัน',
+    examKeyOf(pp) !== examKeyOf(Object.assign({}, pp, { sub:'', subs:[] })));
+}
+pickAllToggle('eSubPick', true); pickSyncAll('eSubPick');
+ok('ปุ่มเลือกทั้งหมดติ๊กครบทุกเรื่อง', pickedSubs('eSubPick').length === nBox);
+ok('ติ๊กครบแล้วช่องหัวเรื่องถูกติ๊กตาม',
+  d.getElementById('eSubPick').querySelector('input[data-pkall]').checked === true);
+pickAllToggle('eSubPick', false); eOnSub();
+ok('ปุ่มล้างที่เลือกล้างได้หมด', pickedSubs('eSubPick').length === 0);
+/* ฝั่งเอกสาร */
+initDocUI();
+const nDoc = pickBoxes('dSubPick').length;
+ok('กล่องติ๊กหัวข้อย่อยของเอกสารถูกสร้าง', nDoc > 0, 'ได้ ' + nDoc);
+ok('เอกสารมีตัวเลือกระบุหัวข้อเอง',
+  !!d.getElementById('dSubPick').querySelector('input[data-pkcus]'));
+if(nDoc >= 2){
+  pickBoxes('dSubPick')[0].checked = true;
+  pickBoxes('dSubPick')[1].checked = true;
+  dOnSub();
+  const dp = docParams();
+  ok('ใบสั่งงานเอกสารเก็บหัวข้อย่อยที่ติ๊กครบ', dp.subs.length === 2 && dp.sub.indexOf(' · ') > 0);
+  ok('บริบทหลักสูตรลิสต์ทุกเรื่องที่ติ๊ก',
+    currContext(dp.grade, dp.topic, dp.sub).indexOf('ครอบคลุมให้ครบทุกเรื่อง') >= 0);
+  ok('อ้างอิงหนังสือยังหาเลขหน้าได้แม้ติ๊กหลายเรื่อง',
+    typeof bookRef(dp.grade, dp.topic, dp.sub) === 'string');
+  dSubAll(false);
+  ok('ล้างที่เลือกของเอกสารแล้วกลับเป็นทั้งบท', docParams().subs.length === 0);
+}
+
+/* ── ป้ายระดับความยากท้ายข้อ ── */
+const _showLv = CFG.showLevel;
+CFG.showLevel = true;
+ok('ป้ายความยากมีสามสี', ['ง่าย','ปานกลาง','ยาก'].every(L => !!LV_CLASS[L]));
+ok('ป้ายความยากแสดงข้อความตรงระดับ',
+  lvBadge('ง่าย').indexOf('ง่าย') >= 0 && lvBadge('ยาก').indexOf(LV_CLASS['ยาก']) >= 0);
+CFG.showLevel = false;
+ok('ปิดป้ายแล้วไม่แสดงบนกระดาษข้อสอบ', lvBadge('ปานกลาง') === '');
+ok('ปิดป้ายแล้วเฉลยยังบอกระดับความยากอยู่', lvBadge('ปานกลาง', true).indexOf('ปานกลาง') >= 0);
+ok('ไม่มีระดับความยากก็ไม่พังและไม่แสดงอะไร', lvBadge('') === '' && lvBadge(undefined, true) === '');
+CFG.showLevel = _showLv;
+ok('ทุกข้อที่วางแผนไว้มีระดับความยากติดมาด้วย',
+  planBuckets(examParams()).every(s => ['ง่าย','ปานกลาง','ยาก'].indexOf(s.level) >= 0));
 ok('เลือกชั้น ป.6 แล้วรายการบทไม่ว่าง', d.getElementById('eScope').options.length > 1);
 ok('ทุกชั้นเปลี่ยนได้โดยไม่ error', GRADES.every(g=>{ try{ pick(g,'onet'); return true; }catch(e){ return false; } }));
   } catch(err){ ok('เทสต์หน้าจอทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
