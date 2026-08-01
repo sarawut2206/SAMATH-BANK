@@ -710,13 +710,14 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
             </div>
             <div class="fx">
               <button class="btn btn-ghost btn-sm" onclick="syncPull()">ดึงจาก Google Sheets</button>
-              <button class="btn btn-ghost btn-sm" onclick="syncPush()">ส่งของในเครื่องขึ้น Sheets</button>
+              <button class="btn btn-ghost btn-sm" onclick="syncPush()">ส่งที่ค้างขึ้นเดี๋ยวนี้</button>
               <button class="btn btn-ghost btn-sm" onclick="exportBank()">สำรองเป็นไฟล์ JSON</button>
               <button class="btn btn-ghost btn-sm" onclick="document.getElementById('impFile').click()">นำเข้าไฟล์สำรอง</button>
               <input type="file" id="impFile" accept=".json" style="display:none" onchange="importBank(this)">
               <span class="sp" style="flex:1"></span>
               <button class="btn btn-danger btn-sm" onclick="clearLocal()">ล้างคลังในเครื่อง</button>
             </div>
+            <div id="syncQueue" class="mt10"></div>
             <div id="syncStatus"></div>
           </div>
         </div>
@@ -4089,6 +4090,7 @@ const COST = {
    ════════════════════════════════════════════════════════════════════ */
 const BANK_LS = 'samath_bank_v9';
 const BANK_META = 'samath_bankmeta_v9';
+const BANK_OUT  = 'samath_outbox_v9';   /* คิวรอส่งขึ้น Sheets — ทยอยส่งเองอัตโนมัติ */
 
 const BANK = {
   db:null, meta:null, _loaded:false, remoteTotal:null,
@@ -4134,10 +4136,10 @@ const BANK = {
     rec.key = key; rec.kind = kind;
     if(!rec.ts) rec.ts = Date.now();
     if(rec.hits===undefined) rec.hits = 0;
+    rec.synced = 0;
     this.db[kind][key] = rec;
     this._save();
-    const p = this.pushRemote(kind, rec);
-    if(p && p.then) p.then(r=>{ if(r && !r.ok) syncWarn(r.error); });
+    this.pushRemote(kind, rec);       /* เข้าคิว แล้วตัวส่งอัตโนมัติจะทยอยส่งเอง */
     return rec;
   },
   touch(kind, key){
@@ -4176,39 +4178,122 @@ const BANK = {
   ready(){ return !!(CFG.url && CFG.url.indexOf('script.google.com')>-1); },
   pushRemote(kind, rec){
     if(!this.ready()) return;
-    const slim = {
+    this.queue({
       action:'put', kind:kind, key:rec.key, grade:rec.grade||'', topic:rec.topic||'',
       sub:rec.sub||'', title:rec.title||'', dtype:rec.dtype||'', bucket:rec.bucket||'',
       model:rec.model||'', tin:rec.tin||0, tout:rec.tout||0,
       payload: (kind==='doc') ? String(rec.html||'')
              : JSON.stringify(kind==='item' ? rec.q : (rec.data||{})),
-      meta: JSON.stringify(rec.meta||{}),
-      password: CFG.pass || ''
-    };
-    return this.post(slim);
-  },
-  /* ส่งข้อมูลขึ้นชีตแล้ว "อ่านคำตอบกลับมาจริง"
-     เดิมใช้ mode:'no-cors' ซึ่งทำให้อ่านผลไม่ได้เลย ถ้าเขียนไม่สำเร็จก็ไม่มีใครรู้
-     ตอนนี้ส่งแบบธรรมดา (body เป็นสตริง = simple request ไม่ต้อง preflight)
-     จึงอ่าน {ok:...} กลับมาได้ และรายงานให้ผู้ใช้เห็น */
-  lastError: '',
-  async post(body){
-    if(!this.ready()) return {ok:false, error:'ยังไม่ได้ตั้งค่า Google Sheets'};
-    try{
-      const r = await fetch(CFG.url, {method:'POST', body: JSON.stringify(body)});
-      let d = null;
-      try{ d = await r.json(); }catch(e){ d = null; }
-      if(!d) { this.lastError = 'ตอบกลับไม่ใช่ JSON (HTTP '+r.status+') — ตรวจว่า Deploy ตั้ง "ทุกคน" และ URL ลงท้าย /exec'; return {ok:false, error:this.lastError}; }
-      if(!d.ok){ this.lastError = d.error || 'ไม่ทราบสาเหตุ'; return {ok:false, error:this.lastError}; }
-      return {ok:true};
-    }catch(e){
-      this.lastError = 'ติดต่อ Google ไม่ได้: ' + (e && e.message ? e.message : e);
-      return {ok:false, error:this.lastError};
-    }
+      meta: JSON.stringify(rec.meta||{})
+    });
   },
   pushHit(kind,key){
     if(!this.ready()) return;
-    this.post({action:'hit', kind:kind, key:key, password:CFG.pass||''});
+    this.queue({action:'hit', kind:kind, key:key});
+  },
+
+  /* ══ กล่องส่งออก ══
+     ทุกชิ้นที่สร้างจะถูกหย่อนลงคิวในเครื่องก่อน แล้วตัวส่งอัตโนมัติจะรวบส่งขึ้นชีต
+     เป็นชุด ชุดละหลายสิบชิ้นในการเรียกครั้งเดียว ถ้าเน็ตหลุดหรือชีตล่ม ของยังอยู่ในคิว
+     และจะถูกส่งต่อเองเมื่อกลับมาออนไลน์ ไม่ต้องกดปุ่มใด ๆ */
+  out:null, _flushing:false, _timer:null, _wait:0, onSync:null,
+  _outLoad(){
+    if(this.out) return this.out;
+    try{ this.out = JSON.parse(localStorage.getItem(BANK_OUT)||'[]') || []; }catch(e){ this.out = []; }
+    if(!Array.isArray(this.out)) this.out = [];
+    return this.out;
+  },
+  _outSave(){ try{ localStorage.setItem(BANK_OUT, JSON.stringify(this.out||[])); }catch(e){} },
+  outCount(){ return this._outLoad().length; },
+  queue(body){
+    const o = this._outLoad();
+    if(body.action==='put'){
+      /* ชิ้นเดิมที่ยังไม่ทันได้ส่ง ให้ตัวใหม่ทับไปเลย จะได้ไม่ส่งซ้ำ */
+      const i = o.findIndex(x=>x.action==='put' && x.kind===body.kind && x.key===body.key);
+      if(i>=0){ o[i]=body; } else { o.push(body); }
+    } else {
+      o.push(body);
+    }
+    if(o.length>5000) o.splice(0, o.length-5000);
+    this._outSave();
+    this.scheduleFlush(1500);
+    this.notify();
+  },
+  notify(){ if(typeof this.onSync==='function'){ try{ this.onSync(); }catch(e){} } },
+  scheduleFlush(ms){
+    if(this._timer) clearTimeout(this._timer);
+    this._timer = setTimeout(()=>{ this._timer=null; this.flush(); }, Math.max(200, ms||1500));
+  },
+  /* หั่นคิวเป็นชุด คุมทั้งจำนวนชิ้นและขนาดรวม เพื่อไม่ให้คำขอใหญ่เกินไป */
+  _chunk(){
+    const o = this._outLoad();
+    const max = 700000, out = [];
+    let size = 0;
+    for(const it of o){
+      const len = (it.payload ? it.payload.length : 0) + 300;
+      if(out.length && (out.length>=40 || size+len>max)) break;
+      out.push(it); size += len;
+    }
+    return out;
+  },
+  markSynced(chunk){
+    this._load();
+    let touched = false;
+    chunk.forEach(it=>{
+      if(it.action!=='put') return;
+      const r = this.db[it.kind] && this.db[it.kind][it.key];
+      if(r && !r.synced){ r.synced = 1; touched = true; }
+    });
+    if(touched) this._save();
+  },
+  async flush(){
+    if(!this.ready() || this._flushing) return {ok:false, busy:this._flushing};
+    if(!this._outLoad().length) return {ok:true, sent:0};
+    this._flushing = true; this.notify();
+    let sent = 0, err = '';
+    try{
+      while(this._outLoad().length){
+        const chunk = this._chunk();
+        if(!chunk.length) break;
+        let r = await this.post({action:'batch', items:chunk, password:CFG.pass||''});
+        /* ชีตที่ยังไม่ได้อัปเดตโค้ดจะไม่รู้จักคำสั่ง batch — ถอยไปส่งทีละชิ้นให้ยังใช้งานได้ */
+        if(!r.ok && /ไม่รู้จักคำสั่ง/.test(r.error||'')){
+          r = await this._flushOneByOne(chunk);
+        }
+        if(!r.ok){ err = r.error || 'ไม่ทราบสาเหตุ'; break; }
+        this.out.splice(0, chunk.length); this._outSave();
+        this.markSynced(chunk);
+        sent += chunk.length;
+        this.notify();
+      }
+    }catch(e){ err = String(e && e.message || e); }
+    this._flushing = false; this.notify();
+    if(err){
+      /* ล้มเหลว → รอแล้วลองใหม่เอง เพิ่มเวลารอทีละเท่าตัว สูงสุด 10 นาที */
+      this._wait = Math.min(this._wait ? this._wait*2 : 20000, 600000);
+      this.scheduleFlush(this._wait);
+      return {ok:false, sent:sent, error:err};
+    }
+    this._wait = 0;
+    return {ok:true, sent:sent};
+  },
+  async _flushOneByOne(chunk){
+    for(const it of chunk){
+      const body = Object.assign({}, it, {password:CFG.pass||''});
+      const r = await this.post(body);
+      if(!r.ok) return r;
+    }
+    return {ok:true};
+  },
+  /* เอาของเก่าที่ยังไม่เคยขึ้นชีตใส่คิวให้ครบ (ใช้ตอนเพิ่งตั้งค่าชีตครั้งแรก) */
+  enqueueUnsynced(all){
+    let n = 0;
+    ['doc','exam','item'].forEach(kind=>{
+      this.all(kind).forEach(rec=>{
+        if(all || !rec.synced){ this.pushRemote(kind, rec); n++; }
+      });
+    });
+    return n;
   },
   async fetchRemote(kind, key){
     if(!this.ready()) return null;
@@ -5563,6 +5648,7 @@ function renderSys(){
 
 /* ════════ REPOSITORY ════════ */
 function renderRepo(){
+  renderSyncBadge();
   const kind = document.getElementById('rKind').value;
   const grade = document.getElementById('rGrade').value;
   const q = (document.getElementById('rSearch').value||'').trim().toLowerCase();
@@ -5660,29 +5746,51 @@ function syncOK(msg){
   const el = document.getElementById('syncStatus');
   if(el) el.innerHTML = `<div class="note info">${esc(msg||'')}</div>`;
 }
-async function syncPush(){
+async function syncPush(force){
   if(!BANK.ready()){ toast('ยังไม่ได้ตั้งค่า Google Sheets'); go('set'); return; }
-  const all = BANK.all('doc').concat(BANK.all('exam'), BANK.all('item'));
-  if(!all.length){ syncOK('ยังไม่มีอะไรในเครื่องให้ส่งขึ้น'); toast('คลังในเครื่องยังว่าง'); return; }
-  syncOK('กำลังส่งขึ้น Sheets 0/'+all.length+' …');
-  let ok=0, fail=0, firstErr='';
-  for(let i=0;i<all.length;i++){
-    const r = await BANK.pushRemote(all[i].kind, all[i]);
-    if(r && r.ok) ok++; else { fail++; if(!firstErr) firstErr = (r&&r.error)||'ไม่ทราบสาเหตุ'; }
-    if(i%5===4){
-      syncOK('กำลังส่งขึ้น Sheets '+(i+1)+'/'+all.length+' …');
-      await new Promise(r=>setTimeout(r,120));
-    }
-    if(fail>=3) break;          /* ล้มติดกัน = ตั้งค่าผิด ไม่ต้องยิงต่อให้เสียเวลา */
+  const n = BANK.enqueueUnsynced(force===true);
+  const pending = BANK.outCount();
+  if(!pending){ syncOK('ของในเครื่องขึ้นชีตครบแล้วทุกชิ้น'); toast('ไม่มีอะไรค้างส่ง'); return; }
+  syncOK('กำลังส่งขึ้น Sheets · ค้างอยู่ ' + pending + ' ชิ้น…');
+  const r = await BANK.flush();
+  if(r.ok && !BANK.outCount()){
+    syncOK('ส่งขึ้นคลังกลางครบแล้ว ' + (r.sent||pending) + ' ชิ้น — เปิด Google Sheet ดูได้เลย');
+    toast('ส่งขึ้นคลังกลางแล้ว');
+  } else if(!r.ok){
+    syncWarn('ส่งไปได้ ' + (r.sent||0) + ' ชิ้น · ยังค้าง ' + BANK.outCount() + ' ชิ้น<br>'
+      + esc(r.error||'') + '<br>ของที่ค้างยังอยู่ในคิว โปรแกรมจะลองส่งเองอีกครั้งให้อัตโนมัติ');
   }
-  if(fail){
-    syncWarn('ส่งสำเร็จ '+ok+' ชิ้น · ล้มเหลว '+fail+' ชิ้น<br>สาเหตุแรก: '+firstErr);
-  } else {
-    syncOK('ส่งขึ้นคลังกลางสำเร็จครบ '+ok+' ชิ้น — เปิด Google Sheet ดูได้เลย');
-    toast('ส่งขึ้นคลังกลางแล้ว '+ok+' ชิ้น');
-  }
-  refreshDash();
+  renderSyncBadge(); refreshDash();
 }
+
+/* แถบสถานะคิวส่งออก — บอกว่าเหลือค้างกี่ชิ้น กำลังส่งอยู่หรือไม่ */
+function renderSyncBadge(){
+  const el = document.getElementById('syncQueue');
+  if(!el) return;
+  const n = BANK.outCount();
+  if(!BANK.ready()){
+    el.innerHTML = '<span class="chip">ยังไม่ได้ต่อ Google Sheets · เก็บในเครื่องอย่างเดียว</span>';
+  } else if(BANK._flushing){
+    el.innerHTML = '<span class="chip teal">กำลังส่งขึ้นชีตอัตโนมัติ · เหลือ ' + n + ' ชิ้น</span>';
+  } else if(n){
+    el.innerHTML = '<span class="chip">รอส่งขึ้นชีต ' + n + ' ชิ้น · โปรแกรมจะส่งให้เอง</span>';
+  } else {
+    el.innerHTML = '<span class="chip teal">ขึ้นชีตครบทุกชิ้นแล้ว</span>';
+  }
+}
+BANK.onSync = renderSyncBadge;
+
+/* ตัวส่งอัตโนมัติ — เปิดโปรแกรม กลับมาที่แท็บ หรือเน็ตกลับมา ก็ส่งต่อเองทันที */
+function startAutoSync(){
+  BANK.scheduleFlush(2500);
+  setInterval(()=>{ if(BANK.outCount()) BANK.flush(); }, 60000);
+  window.addEventListener('online', ()=>BANK.flush());
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) BANK.flush(); });
+  window.addEventListener('beforeunload', e=>{
+    if(BANK.outCount() && BANK.ready()){ e.preventDefault(); e.returnValue = ''; }
+  });
+}
+
 function exportBank(){
   BANK._load();
   const blob = new Blob([JSON.stringify({v:9, cfgTeacher:CFG.teacher, db:BANK.db, meta:BANK.meta}, null, 1)],
@@ -5985,6 +6093,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   ['gKey','gPass'].forEach(id=>{
     document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') doEnter(); });
   });
+  startAutoSync();
   if(CFG.key && CFG.key.length>20){ startApp(); }
   else { document.getElementById('gPass').value = CFG.pass||''; }
 });
@@ -6003,7 +6112,7 @@ window.SAMATH = {
    เรียกได้จากปุ่ม "ตรวจความสมบูรณ์ของโปรแกรม" ในหน้าตั้งค่า
    หรือพิมพ์ __selfTest() ในคอนโซลของเบราว์เซอร์ (F12)
    ══════════════════════════════════════════════════════════════════════ */
-function runSelfTest(){
+async function runSelfTest(){
   let pass = 0, fail = 0; const failed = [];
   function ok(name, cond, extra){
     if(cond) pass++; else { fail++; failed.push(name + (extra ? ' → ' + extra : '')); }
@@ -6219,6 +6328,86 @@ ok('ทุกชั้นเปลี่ยนได้โดยไม่ error'
     }catch(e){}
   }
 
+  /* ══ 9. คิวส่งขึ้นชีตอัตโนมัติ ══ */
+  const _out = BANK._outLoad().slice(), _ready = BANK.ready;
+  ok('ready() ดูจาก URL ของ Apps Script',
+     BANK.ready() === !!(CFG.url && CFG.url.indexOf('script.google.com') > -1));
+  try{
+    BANK.ready = function(){ return true; };   /* จำลองว่าต่อชีตไว้แล้ว โดยไม่ยิงเน็ตจริง */
+    if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }   /* กันตัวส่งอัตโนมัติแทรกกลางเทสต์ */
+    BANK.out = [];
+    BANK.queue({action:'put', kind:'doc', key:'k1', payload:'a'});
+    BANK.queue({action:'put', kind:'doc', key:'k1', payload:'b'});
+    ok('เข้าคิวชิ้นเดิมซ้ำ ไม่บวมเป็นสองรายการ', BANK.outCount() === 1, String(BANK.outCount()));
+    ok('ตัวใหม่ทับตัวเก่าในคิว', BANK.out[0].payload === 'b');
+    BANK.queue({action:'put', kind:'item', key:'k1', payload:'c'});
+    ok('คีย์เดียวกันแต่คนละชนิด นับแยกกัน', BANK.outCount() === 2);
+    BANK.queue({action:'hit', kind:'doc', key:'k1'});
+    BANK.queue({action:'hit', kind:'doc', key:'k1'});
+    ok('การนับใช้ซ้ำไม่ถูกยุบรวม', BANK.outCount() === 4);
+
+    BANK.out = [];
+    for(let i=0;i<100;i++) BANK.queue({action:'put', kind:'doc', key:'x'+i, payload:'y'});
+    ok('คิวรับของได้ครบ 100 ชิ้น', BANK.outCount() === 100);
+    ok('หั่นเป็นชุดละไม่เกิน 40 ชิ้น', BANK._chunk().length === 40, String(BANK._chunk().length));
+
+    const big = new Array(400001).join('z');
+    BANK.out = [{action:'put',kind:'doc',key:'b1',payload:big},
+                {action:'put',kind:'doc',key:'b2',payload:big},
+                {action:'put',kind:'doc',key:'b3',payload:big}];
+    ok('ชิ้นใหญ่ถูกหั่นตามขนาด ไม่ใช่ตามจำนวน', BANK._chunk().length === 1, String(BANK._chunk().length));
+    BANK.out = [{action:'put',kind:'doc',key:'huge',payload:new Array(900001).join('z')}];
+    ok('ชิ้นเดียวที่ใหญ่เกินเพดานก็ยังถูกส่ง ไม่ค้างคิวถาวร', BANK._chunk().length === 1);
+
+    /* ทำเครื่องหมายว่าขึ้นชีตแล้ว */
+    BANK._load();
+    const keep = BANK.db.doc['__selftest__'];
+    BANK.db.doc['__selftest__'] = {key:'__selftest__', kind:'doc'};
+    BANK.markSynced([{action:'put', kind:'doc', key:'__selftest__'}]);
+    ok('ส่งสำเร็จแล้วติดธงว่าขึ้นชีตแล้ว', BANK.db.doc['__selftest__'].synced === 1);
+    if(keep) BANK.db.doc['__selftest__'] = keep; else delete BANK.db.doc['__selftest__'];
+    BANK._save();
+
+    /* ══ 10. ส่งขึ้นชีตทั้งกระบวนการ (ใช้ตัวส่งจำลอง ไม่แตะเน็ตจริง) ══ */
+    const realPost = BANK.post;
+    let calls = [];
+    try{
+      if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }
+      BANK._flushing = false;
+      BANK.post = async function(body){ calls.push(body); return {ok:true}; };
+      BANK.out = [];
+      for(let i=0;i<95;i++) BANK.out.push({action:'put', kind:'doc', key:'f'+i, payload:'y'});
+      if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }
+      let res = await BANK.flush();
+      ok('ส่ง 95 ชิ้นด้วยการเรียกชีตเพียง 3 ครั้ง', calls.length === 3, calls.length + ' ครั้ง');
+      ok('ทุกครั้งใช้คำสั่งเขียนเป็นชุด', calls.every(c=>c.action === 'batch'));
+      ok('ส่งครบแล้วคิวว่าง', res.ok && res.sent === 95 && BANK.outCount() === 0);
+      ok('แนบรหัสผ่านไปทุกครั้ง', calls.every(c=>'password' in c));
+
+      calls = [];
+      BANK.post = async function(body){
+        if(body.action === 'batch') return {ok:false, error:'ไม่รู้จักคำสั่ง: batch'};
+        calls.push(body); return {ok:true};
+      };
+      BANK.out = [{action:'put',kind:'doc',key:'o1',payload:'y'},
+                  {action:'put',kind:'doc',key:'o2',payload:'y'}];
+      res = await BANK.flush();
+      ok('ชีตเวอร์ชันเก่าที่ยังไม่รู้จักคำสั่งชุด ถอยไปส่งทีละชิ้นได้เอง',
+         res.ok && calls.length === 2 && BANK.outCount() === 0, calls.length + ' ครั้ง');
+
+      BANK.post = async function(){ return {ok:false, error:'เน็ตหลุด'}; };
+      BANK.out = [{action:'put',kind:'doc',key:'z1',payload:'y'}];
+      res = await BANK.flush();
+      ok('ส่งไม่สำเร็จแล้วของยังอยู่ในคิวครบ ไม่หาย', !res.ok && BANK.outCount() === 1);
+      ok('ตั้งเวลาลองส่งใหม่ให้เองอัตโนมัติ', BANK._wait > 0);
+      if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }
+      BANK._wait = 0;
+    } finally { BANK.post = realPost; }
+  } catch(err){ ok('เทสต์คิวทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally{
+    BANK.ready = _ready; BANK.out = _out; BANK._outSave();
+  }
+
   return { pass: pass, fail: fail, total: pass + fail, failed: failed };
 }
 window.__selfTest = runSelfTest;
@@ -6226,9 +6415,9 @@ window.__selfTest = runSelfTest;
 function uiSelfTest(){
   const box = document.getElementById('selfTestOut');
   if(box) box.innerHTML = '<div class="note info">กำลังตรวจ…</div>';
-  setTimeout(function(){
+  setTimeout(async function(){
     let r;
-    try{ r = runSelfTest(); }
+    try{ r = await runSelfTest(); }
     catch(e){ if(box) box.innerHTML = '<div class="note warn">ตรวจไม่สำเร็จ: '+esc(String(e && e.message || e))+'</div>'; return; }
     const head = 'ผ่าน ' + r.pass + ' / ' + r.total + ' รายการ';
     if(!r.fail){
