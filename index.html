@@ -4145,6 +4145,34 @@ async function callAI(prompt, opt){
   };
 }
 
+/* ดึงอ็อบเจกต์ที่ปิดวงเล็บครบออกมาทีละตัว โดยข้ามเครื่องหมายที่อยู่ในสตริง */
+function app_maxTokFor(n){ return Math.min(8000, 1000*n + 900); }
+function app_batchSize(){ return 4; }
+function salvageObjects(s){
+  const out = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for(let i = 0; i < s.length; i++){
+    const c = s[i];
+    if(inStr){
+      if(esc){ esc = false; continue; }
+      if(c === '\\'){ esc = true; continue; }
+      if(c === '"') inStr = false;
+      continue;
+    }
+    if(c === '"'){ inStr = true; continue; }
+    if(c === '{'){ if(depth === 0) start = i; depth++; continue; }
+    if(c === '}'){
+      depth--;
+      if(depth === 0 && start >= 0){
+        const chunk = s.slice(start, i + 1);
+        try{ out.push(JSON.parse(chunk)); }catch(e){}
+        start = -1;
+      }
+      if(depth < 0) depth = 0;
+    }
+  }
+  return out;
+}
 /* ทำความสะอาด JSON ที่ AI ส่งมา — แก้ backslash ของ LaTeX ที่ escape ไม่ครบ */
 function safeJSON(raw){
   let s = String(raw).replace(/^\uFEFF/,'').replace(/[\u200B-\u200D\uFEFF]/g,'');
@@ -4159,9 +4187,11 @@ function safeJSON(raw){
   catch(e){
     const a = s.indexOf('['), b = s.lastIndexOf(']');
     if(a>-1 && b>a){ try{ return JSON.parse(s.slice(a,b+1)); }catch(e2){} }
-    /* ตัดข้อสุดท้ายที่ไม่สมบูรณ์ทิ้ง แล้วปิดวงเล็บ */
-    const last = s.lastIndexOf('},');
-    if(last>0){ try{ return JSON.parse(s.slice(0,last+1)+']'); }catch(e3){} }
+    /* กู้ทีละข้อ: ไล่อ่านวงเล็บปีกกาโดยรู้ว่าอยู่ในสตริงหรือไม่
+       ข้อที่ปิดครบจะถูกเก็บไว้ ข้อสุดท้ายที่ถูกตัดกลางคันจะถูกทิ้ง
+       วิธีนี้ทำให้คำตอบที่ยาวเกินโควตายังใช้งานได้เกือบทั้งหมด */
+    const salvaged = salvageObjects(s);
+    if(salvaged.length) return salvaged;
     throw new Error('อ่านผลลัพธ์จาก AI ไม่ได้ (JSON ไม่สมบูรณ์) — ลองกดสร้างใหม่อีกครั้ง');
   }
 }
@@ -4944,11 +4974,11 @@ async function examGenerate(force){
   slots.forEach((s,i)=>{ if(!picked[i]){ const k=s.bucket; (todo[k]=todo[k]||{g:s,idx:[]}).idx.push(i); } });
   const jobs = [];
   Object.values(todo).forEach(job=>{
-    const BATCH = 6;
+    const BATCH = app_batchSize();
     for(let i=0;i<job.idx.length;i+=BATCH) jobs.push({g:job.g, idx:job.idx.slice(i,i+BATCH)});
   });
 
-  let done = 0, newN = 0, tin=0, tout=0, modelUsed = p.model;
+  let done = 0, newN = 0, tin=0, tout=0, modelUsed = p.model, missing = 0, lastErr = null;
   try{
     for(const job of jobs){
       done++;
@@ -4956,10 +4986,10 @@ async function examGenerate(force){
       examProgress(true, `กำลังออกข้อสอบชุดที่ ${done}/${jobs.length} — ${job.g.topic} (${job.g.level})`, pct,
         `ใช้ซ้ำจากคลังแล้ว ${reusedN} ข้อ · สร้างใหม่ ${newN} ข้อ`);
       let arr = [];
-      for(let attempt=0; attempt<2 && arr.length<job.idx.length; attempt++){
+      for(let attempt=0; attempt<3 && arr.length<job.idx.length; attempt++){
         try{
           const r = await callAI(itemPrompt(p, job.g, job.idx.length), {
-            model:p.model, maxTok: 420*job.idx.length + 500, json:true
+            model:p.model, maxTok: app_maxTokFor(job.idx.length), json:true
           });
           modelUsed = r.model; tin += r.usage.input_tokens||0; tout += r.usage.output_tokens||0;
           const got = safeJSON(r.text);
@@ -4973,10 +5003,13 @@ async function examGenerate(force){
             });
           }
         }catch(err){
-          if(attempt===1) throw err;
-          await new Promise(r=>setTimeout(r,700));
+          lastErr = err;
+          /* API Key ผิดหรือโดนจำกัดอัตรา = ลองต่อไปก็ไม่มีประโยชน์ ให้หยุดทันที */
+          if(/API Key|rate limit|เรียกถี่/.test(err.message||'')) throw err;
+          await new Promise(r=>setTimeout(r, 700*(attempt+1)));
         }
       }
+      if(arr.length < job.idx.length) missing += (job.idx.length - arr.length);
       job.idx.forEach((slotIdx,k)=>{
         if(arr[k]){
           const q = arr[k];
@@ -5006,9 +5039,15 @@ async function examGenerate(force){
   const items = picked.filter(Boolean);
   if(!items.length){
     examProgress(false);
-    document.getElementById('examPaper').innerHTML = `<div class="note err">ไม่ได้ข้อสอบที่ผ่านการตรวจเลย ลองลดจำนวนข้อหรือเปลี่ยนโมเดล</div>`;
+    document.getElementById('examPaper').innerHTML =
+      `<div class="note err"><b>ไม่ได้ข้อสอบที่ผ่านการตรวจเลย</b>` +
+      (lastErr ? `<br>สาเหตุล่าสุด: ${esc(lastErr.message)}` : '') +
+      `<br>ลองลดจำนวนข้อ เปลี่ยนโมเดลเป็นคุณภาพสูงขึ้น หรือกดสร้างใหม่อีกครั้ง</div>`;
+    refreshDash();
     return;
   }
+  /* ได้ไม่ครบก็ยังใช้งานได้ — ออกฉบับเท่าที่ได้ แล้วบอกตรง ๆ ว่าขาดไปกี่ข้อ */
+  const shortBy = missing;
 
   examProgress(true,'กำลังเรียงข้อและทำตารางวิเคราะห์…',96);
   const rec = {
@@ -5022,6 +5061,15 @@ async function examGenerate(force){
   examCurrent = rec;
   examProgress(false);
   paintExam(rec, {reused:false, partialReuse:reusedN});
+  if(shortBy > 0){
+    const paper = document.getElementById('examPaper');
+    const warn = document.createElement('div');
+    warn.className = 'note err';
+    warn.innerHTML = `<b>ได้ไม่ครบตามที่สั่ง</b> — ขาดไป ${shortBy} ข้อ` +
+      (lastErr ? `<br>สาเหตุล่าสุด: ${esc(lastErr.message)}` : '') +
+      `<br>ข้อที่ได้แล้วถูกเก็บเข้าคลังเรียบร้อย กดสร้างใหม่อีกครั้งจะเติมให้ครบและถูกลงมาก`;
+    paper.insertBefore(warn, paper.firstChild);
+  }
   toast(`เสร็จแล้ว — ใช้ซ้ำจากคลัง ${reusedN} ข้อ สร้างใหม่ ${newN} ข้อ`);
   checkExamCache();
   refreshDash();
