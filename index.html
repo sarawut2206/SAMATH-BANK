@@ -406,6 +406,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
           <h1 id="dashGreet">แดชบอร์ด</h1>
           <p>ภาพรวมคลังเอกสารและคลังข้อสอบของคุณ พร้อมยอดที่คลังกลางช่วยประหยัดค่า API ไปได้</p>
         </div>
+        <div id="dashWarn"></div>
 
         <div class="grid g4 mb20">
           <div class="stat"><div class="stat-k">เอกสารในคลัง</div><div class="stat-v" id="sDoc">0</div><div class="stat-s" id="sDocSub">ยังไม่มีเอกสาร</div></div>
@@ -3810,7 +3811,7 @@ const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
-  key:'', pass:'', url:'', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
+  key:'', pass:'samath2569', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
   teacher:'', school:'', term:'', books:{}, layout:'compact'
 };
 let CFG = Object.assign({}, CFG_DEF);
@@ -5290,15 +5291,26 @@ function renderRecent(){
 function renderSys(){
   const rows = [];
   rows.push(['API Key', CFG.key && CFG.key.length>20 ? ['ok','พร้อมใช้งาน'] : ['stamp','ยังไม่ได้ตั้งค่า']]);
-  rows.push(['คลังกลาง Google Sheets', BANK.ready() ? ['ok','เชื่อมต่อแล้ว'] : ['stamp','ยังไม่ได้เชื่อม — ทำงานแบบเก็บในเครื่อง']]);
+  rows.push(['คลังกลาง Google Sheets', BANK.ready()
+    ? ['ok','เชื่อมต่อแล้ว']
+    : ['stamp','ยังไม่ได้เชื่อม — กดที่นี่เพื่อตั้งค่า', 'go(\'set\')']]);
   rows.push(['โมเดลเริ่มต้น', ['teal', modelById(CFG.model).name]]);
   rows.push(['นโยบายสร้างใหม่', ['teal', Math.round((CFG.fresh||0)*100)+'% เมื่อคลังลึกเกิน '+CFG.depth+' ข้อ']]);
   rows.push(['หลักสูตรในระบบ', ['teal', Object.keys(CURRICULUM).length+' ระดับชั้น · '+
     Object.values(CURRICULUM).reduce((a,b)=>a+b.length,0)+' บทเรียน · '+
     Object.values(CURRICULUM).reduce((a,b)=>a+b.reduce((x,t)=>x+t.subs.length,0),0)+' หัวข้อย่อย']]);
+  const warn = document.getElementById('dashWarn');
+  if(warn){
+    warn.innerHTML = BANK.ready() ? '' :
+      `<div class="note err" style="margin-bottom:14px">
+         <b>ยังไม่ได้เชื่อมคลังกลาง</b> — ตอนนี้ทุกอย่างเก็บอยู่ในเครื่องนี้เท่านั้น
+         ถ้าย้ายไฟล์ ล้างข้อมูลเบราว์เซอร์ หรือเปลี่ยนเครื่อง จะหายทั้งหมด
+         <br><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="go('set')">ไปหน้าตั้งค่า</button>
+       </div>`;
+  }
   document.getElementById('sysStatus').innerHTML =
     `<table class="tbl"><tbody>` + rows.map(r=>
-      `<tr><td style="width:38%">${esc(r[0])}</td><td><span class="chip ${r[1][0]}">${esc(r[1][1])}</span></td></tr>`
+      `<tr><td style="width:38%">${esc(r[0])}</td><td><span class="chip ${r[1][0]}"${r[1][2]?` role="button" style="cursor:pointer" onclick="${r[1][2]}"`:''}>${esc(r[1][1])}</span></td></tr>`
     ).join('') + `</tbody></table>`;
 }
 
