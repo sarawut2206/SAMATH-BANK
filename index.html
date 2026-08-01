@@ -310,6 +310,9 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 /* หนึ่งหน้ากระดาษ — เฉลี่ยพื้นที่ว่างให้ทุกข้อเท่า ๆ กัน */
 .paper .qpage{display:flex;flex-direction:column;gap:6px;}
 .paper .qpage>.qcontest{flex:1 1 0;display:flex;flex-direction:column;min-height:150px;}
+.paper .qbody{flex:0 0 auto;}
+.paper .qitem mjx-container{display:inline-block!important;margin:0 1px!important;vertical-align:baseline;}
+.paper .qitem mjx-container[display="true"]{display:block!important;margin:6px 0!important;}
 .paper .qcontest{margin:0;padding:10px 0 6px;border-bottom:1px dashed var(--line);}
 .paper .qpage-last>.qcontest:last-child{border-bottom:none;}
 .paper .qwork{flex:1 1 auto;min-height:64px;margin:8px 0 4px;position:relative;}
@@ -4191,7 +4194,20 @@ function renderMath(el){
 function sheetHTML(id){
   const el = document.getElementById(id);
   if(!el) return '';
-  return RAWHTML[id] || el.innerHTML;
+  let html = RAWHTML[id] || el.innerHTML;
+  /* ถ้าผู้ใช้สั่งซ่อนเฉลยไว้ ต้องไม่ติดไปกับการพิมพ์ / PDF / .doc ด้วย */
+  if(id === 'examPaper' && !examShowKey && html.indexOf('id="examKeyBlock"') >= 0){
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    const k = box.querySelector('#examKeyBlock');
+    if(k){
+      const pb = k.previousElementSibling;
+      if(pb && pb.classList && pb.classList.contains('pgbreak')) pb.remove();
+      k.remove();
+    }
+    html = box.innerHTML;
+  }
+  return html;
 }
 /* ════════════════════════════════════════════════════════════════════
    DOCUMENT STUDIO — คลังเอกสาร ป.1–ม.6
@@ -5082,19 +5098,22 @@ function paintExam(rec, opt){
   const PER_PAGE = 3;
   const contest = layout==='contest';
   const body = items.map((q,i)=>{
-    let b = `<div class="qitem${contest?' qcontest':''}"><span class="qnum">${i+1}.</span> ${q.q}`;
+    /* เนื้อโจทย์ต้องอยู่ในกล่องเดียว (.qbody) ที่ไหลเป็นข้อความปกติ
+       ถ้าเอาโจทย์ไปวางตรง ๆ ในกล่องที่เป็น flex ทุกสูตรจะกลายเป็นบล็อกแยกบรรทัด */
+    let b = `<div class="qitem${contest?' qcontest':''}"><div class="qbody">`
+          + `<span class="qnum">${i+1}.</span> ${q.q}`;
     if(Array.isArray(q.choices)){
       b += `<div class="qch ${chCols(q.choices)}">`
-         + q.choices.map((c,k)=>`<div><span class="chn">${LT[k]||k+1}.</span> ${c}</div>`).join('')
-         + `</div>`;
+         + q.choices.map((c,k)=>`<div><span class="chn">${LT[k]||k+1}.</span> <span>${c}</span></div>`).join('')
+         + `</div></div>`;
       if(contest) b += `<div class="qwork"></div>`;
+    } else if(contest){
+      b += `</div><div class="qwork qwork-lined"><span class="worklbl">วิธีทำ</span></div>
+            <div class="qans">ตอบ ................................................................</div>`;
     } else {
-      b += contest
-        ? `<div class="qwork qwork-lined"><span class="worklbl">วิธีทำ</span></div>
-           <div class="qans">ตอบ ................................................................</div>`
-        : `<br><br>วิธีทำ ................................................................................<br><br>
+      b += `<br><br>วิธีทำ ................................................................................<br><br>
             ................................................................................<br><br>
-            ตอบ ..............................................`;
+            ตอบ ..............................................</div>`;
     }
     return b + `</div>`;
   });
@@ -5165,7 +5184,9 @@ function toggleKey(){
   if(!b){ toast('ยังไม่มีข้อสอบ'); return; }
   examShowKey = !examShowKey;
   b.style.display = examShowKey ? '' : 'none';
-  toast(examShowKey ? 'แสดงเฉลย' : 'ซ่อนเฉลยแล้ว — พิมพ์ได้เลย');
+  const btn = document.getElementById('btnKey');
+  if(btn) btn.textContent = examShowKey ? 'ซ่อนเฉลย' : 'แสดงเฉลย (ตอนนี้ซ่อนอยู่)';
+  toast(examShowKey ? 'แสดงเฉลยแล้ว' : 'ซ่อนเฉลยแล้ว — พิมพ์และบันทึกจะไม่มีเฉลยติดไปด้วย');
 }
 function qaExam(id){
   go('exam');
@@ -5619,6 +5640,9 @@ ul,ol{margin:8px 0 8px 22px;} li{margin:3px 0;}
 .qpage{display:flex;flex-direction:column;gap:4mm;height:243mm;}
 .qpage:first-of-type{height:212mm;}
 .qpage>.qcontest{flex:1 1 0;display:flex;flex-direction:column;min-height:0;}
+.qbody{flex:0 0 auto;}
+mjx-container{display:inline-block!important;margin:0 1px!important;vertical-align:baseline;}
+mjx-container[display="true"]{display:block!important;margin:5px 0!important;}
 .qcontest{margin:0;padding-top:3mm;page-break-inside:avoid;border-bottom:1px dashed #ccc;padding-bottom:2mm;}
 .qpage-last>.qcontest:last-child{border-bottom:none;}
 .qwork{flex:1 1 auto;min-height:14mm;margin:3mm 0 2mm;}
