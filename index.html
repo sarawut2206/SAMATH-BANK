@@ -284,16 +284,29 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 }
 @media print{
   .rail,.topstrip,.sheet-bar,.tabs,.order,#toast{display:none!important;}
+  .paper .pgbreak{page-break-after:always;border:none;height:0;margin:0;}
+  .paper .pgbreak::after{display:none;}
+  .paper .qcontest{page-break-inside:avoid;}
   #shell.on{display:block;} .wrap{padding:0;max-width:none;}
   .sheet-shell{border:none;box-shadow:none;border-radius:0;}
   .paper{padding:0;}
   body{background:#fff;}
 }
 .bookref{color:var(--brass);font-size:12px;}
+/* ── รูปแบบข้อสอบแนวแข่งขัน: 3 ข้อ/หน้า มีที่ให้เขียน ── */
+.paper .qch3{grid-template-columns:repeat(3,1fr);gap:4px 12px;}
+@media(max-width:720px){.paper .qch3{grid-template-columns:1fr 1fr;}}
+.paper .qcontest{margin:0 0 10px;padding:10px 0 0;border-bottom:1px dashed var(--line);}
+.paper .qwork{min-height:96px;margin:10px 0 4px;position:relative;}
+.paper .qwork-lined{min-height:120px;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 27px,var(--line) 27px,var(--line) 28px);}
+.paper .worklbl{font-size:12px;color:var(--mut);}
+.paper .qans{border-top:1px solid var(--line);padding-top:6px;font-size:14px;}
+.paper .pgbreak{height:0;border-top:2px dashed var(--brass);margin:18px 0;position:relative;}
+.paper .pgbreak::after{content:'ขึ้นหน้าใหม่';position:absolute;right:0;top:-9px;background:var(--paper);padding:0 6px;font-size:10px;color:var(--brass);letter-spacing:.06em;}
 </style>
 <script>
 window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},
-  options:{skipHtmlTags:['script','noscript','style','textarea','pre']},svg:{fontCache:'global'}};
+  options:{skipHtmlTags:['script','noscript','style','textarea','pre']},svg:{fontCache:'local'}};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 </head>
@@ -503,6 +516,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <span class="chip" id="docBadge">ยังไม่มีเอกสาร</span>
               <span class="sp"></span>
               <button class="btn btn-ghost btn-sm" onclick="printSheet('docPaper')">พิมพ์</button>
+              <button class="btn btn-ghost btn-sm" onclick="savePDF('docPaper')">บันทึก PDF</button>
               <button class="btn btn-ghost btn-sm" onclick="exportWord('docPaper')">บันทึก .doc</button>
               <button class="btn btn-ghost btn-sm" onclick="copySheet('docPaper')">คัดลอก</button>
             </div>
@@ -583,11 +597,20 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   <div class="fld">
                     <label for="eFormat">รูปแบบข้อ</label>
                     <select id="eFormat">
-                      <option value="mcq4">ปรนัย 4 ตัวเลือก</option>
-                      <option value="mcq5">ปรนัย 5 ตัวเลือก</option>
+                      <option value="mcq4">ปรนัย 4 ตัวเลือก (ก ข ค ง)</option>
+                      <option value="mcq4num">ปรนัย 4 ตัวเลือก (1–4) แนว O-NET</option>
+                      <option value="mcq5">ปรนัย 5 ตัวเลือก (1–5)</option>
+                      <option value="mcq5abc">ปรนัย 5 ตัวเลือก (A–E) แนวแข่งขัน</option>
                       <option value="short">เติมคำตอบสั้น</option>
                       <option value="show">แสดงวิธีทำ</option>
                       <option value="mix">ผสม (ปรนัย + อัตนัย)</option>
+                    </select>
+                  </div>
+                  <div class="fld">
+                    <label for="eLayout">จัดหน้ากระดาษ</label>
+                    <select id="eLayout" onchange="setLayout(this.value)">
+                      <option value="compact">ประหยัดกระดาษ (ต่อเนื่อง)</option>
+                      <option value="contest">แนวแข่งขัน — 3 ข้อ/หน้า มีที่ให้เขียน</option>
                     </select>
                   </div>
                   <div class="fld">
@@ -618,6 +641,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <span class="sp"></span>
               <button class="btn btn-ghost btn-sm" id="btnKey" onclick="toggleKey()">ซ่อน/แสดงเฉลย</button>
               <button class="btn btn-ghost btn-sm" onclick="printSheet('examPaper')">พิมพ์</button>
+              <button class="btn btn-ghost btn-sm" onclick="savePDF('examPaper')">บันทึก PDF</button>
               <button class="btn btn-ghost btn-sm" onclick="exportWord('examPaper')">บันทึก .doc</button>
             </div>
             <div class="prog" id="examProg">
@@ -2504,6 +2528,238 @@ function bookBlock(grade, topic, sub){
   return r ? `\n【อ้างอิงหนังสือเรียนที่โรงเรียนใช้】 ${r}` : '';
 }
 function hasBook(grade){ return !!BOOKSHELF[grade]; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   ONET — พิมพ์เขียวข้อสอบ O-NET จากการวิเคราะห์ข้อสอบเก่า ปี 2557–2566
+   ถอดจากไฟล์ที่ผู้ใช้อัปโหลด (แยกตามสาระ 3 ชุด รวม 190 ข้อ)
+   เก็บเฉพาะ "สัดส่วนตัวชี้วัด · รูปแบบข้อ · แม่พิมพ์โจทย์" ไม่คัดลอกตัวโจทย์
+   ══════════════════════════════════════════════════════════════════════ */
+
+const ONET = {
+  'ม.3': {
+    label: 'O-NET คณิตศาสตร์ ม.3',
+    years: '2557–2566',
+    total: 190,
+    freeRatio: 0.16,          /* สัดส่วนข้อ "เติมคำตอบ" ที่พบจริง ≈ 1 ใน 6 */
+    strands: [
+      { n:1, name:'จำนวนและพีชคณิต', count:75, inds:[
+        { code:'ค 1.1 ม.1/3', name:'อัตราส่วน สัดส่วน และร้อยละ', count:12,
+          curr:['อัตราส่วน สัดส่วน และร้อยละ ม.1'],
+          arche:[
+            'กำหนดอัตราส่วนต่อเนื่องของสามปริมาณ (a : b และ b : c) พร้อมผลต่างของสองปริมาณ แล้วให้หาจำนวนรวมทั้งหมด',
+            'กำหนดอัตราส่วนของสองกลุ่ม แล้วมีการเพิ่มหรือลดจำนวนในกลุ่มหนึ่ง ทำให้อัตราส่วนเปลี่ยนไป ให้หาจำนวนที่เปลี่ยน',
+            'กำหนดอัตราส่วนแบ่งเงินหรือทรัพยากรเป็นสามส่วน แล้วให้หาผลต่างของสองส่วน',
+            'ตารางร้อยละของกลุ่มตัวอย่างที่เว้นช่องหนึ่งไว้ ให้หาจำนวนคนของช่องที่เว้น',
+            'โจทย์ติดราคา–ลดราคา–ยังได้กำไร ให้หาจำนวนเงินกำไรหรือราคาขายสุทธิ',
+            'โจทย์บวกราคาขึ้น r% แล้วลดลง r% ให้หาราคาสุดท้าย (ดักความเข้าใจผิดว่าเท่าทุน)'
+          ]},
+        { code:'ค 1.1 ม.2/1', name:'เลขยกกำลังและสัญกรณ์วิทยาศาสตร์', count:11,
+          curr:['เลขยกกำลังที่มีเลขชี้กำลังเป็นจำนวนเต็ม'],
+          arche:[
+            'รวมหรือหาผลต่างของจำนวนขนาดใหญ่จากข้อมูลจริง (รายได้ภาครัฐ มูลค่าส่งออก) แล้วตอบในรูปสัญกรณ์วิทยาศาสตร์',
+            'หาค่าเฉลี่ยของจำนวนขนาดใหญ่หลายจำนวน แล้วตอบในรูป $A \\\\times 10^n$',
+            'ทำนิพจน์ที่มีเลขยกกำลังซ้อนหลายชั้นให้อยู่ในรูปอย่างง่าย แล้วเทียบกับตัวเลือก',
+            'เปรียบเทียบว่าจำนวนในรูปเลขยกกำลังข้อใดมากที่สุด (ฐานต่างกัน ต้องทำฐานให้เท่ากันก่อน)',
+            'กำหนดสมการเลขยกกำลังสองสมการ ให้หา $x+y$ หรือ $m \\\\times n$',
+            'โจทย์แบ่งปริมาณสารในรูปสัญกรณ์วิทยาศาสตร์ ให้หาจำนวนภาชนะที่แบ่งได้'
+          ]},
+        { code:'ค 1.1 ม.2/2', name:'จำนวนจริง ห.ร.ม. ค.ร.น. และการประยุกต์', count:22,
+          curr:['จำนวนจริง ม.2'],
+          arche:[
+            'หาค่าของนิพจน์ที่มีกรณฑ์ที่สองและกรณฑ์ที่สามผสมกัน',
+            'กำหนดรากที่สามของ A แล้วให้หารากที่สองที่เป็นบวกของ A',
+            'โจทย์ ห.ร.ม.: แบ่งคนหรือของออกเป็นกลุ่มให้เท่ากันและมากที่สุด ให้หาจำนวนกลุ่ม',
+            'โจทย์ ค.ร.น.: เหตุการณ์เกิดซ้ำคนละคาบ ให้หาวันที่จะเกิดพร้อมกันครั้งต่อไป (ต้องระวังจำนวนวันในเดือน)',
+            'กำหนดผลบวกและผลคูณของสองจำนวน ให้หาผลหารหรือผลต่างของทั้งสอง',
+            'โจทย์สองตัวแปรจากราคาสินค้าสองชนิดและจำนวนที่ต่างกัน ให้หาจำนวนของชนิดหนึ่ง',
+            'หาจำนวนเต็ม n ที่ทำให้เศษส่วนอยู่ระหว่างเศษส่วนสองจำนวนที่กำหนด',
+            'คำนวณนิพจน์ระคนของเศษส่วน ทศนิยม และจำนวนคละ ตามลำดับการดำเนินการ',
+            'โจทย์สัดส่วนของส่วนผสมหลายชนิดในของเหลวรวม ให้หาปริมาณของชนิดหนึ่ง'
+          ]},
+        { code:'ค 1.2 · ค 1.3', name:'พหุนาม ฟังก์ชันกำลังสอง สมการและอสมการ', count:30,
+          curr:['ฟังก์ชันกำลังสอง','ระบบสมการเชิงเส้นสองตัวแปร','สมการกำลังสองตัวแปรเดียว','การแยกตัวประกอบของพหุนามดีกรีสูงกว่าสอง'],
+          arche:[
+            'ตรวจสอบว่าจุดใดไม่อยู่บนกราฟของสมการเส้นตรงที่กำหนด',
+            'กำหนดว่าเส้นตรงผ่านจุดหนึ่งและขนานกับเส้นตรงอีกเส้น ให้หา $a+b$ ของ $y=ax+b$',
+            'แก้ระบบสมการเชิงเส้นสองตัวแปร แล้วให้หาค่าของนิพจน์ที่ประกอบจากคำตอบ หรือบอกว่าข้อใดผิด',
+            'หาค่า k ที่ทำให้พหุนามเป็นกำลังสองสมบูรณ์',
+            'กระจายและรวมนิพจน์ $(x+a)^2+(x-b)(x+b)$ แล้วเทียบกับตัวเลือก',
+            'กำหนดพาราโบลาคว่ำผ่านจุดสองจุดที่มีค่า y เท่ากัน ให้หาพิกัด h ของจุดสูงสุด (ใช้ความสมมาตร)',
+            'กำหนดจุดต่ำสุดของ $f(x)=ax^2+bx+c$ ให้หา $a+b$ หรือ $b+c$',
+            'เขียนความสัมพันธ์เชิงเส้นจากสถานการณ์ค่าบริการ แล้วเลือกสมการที่ถูกต้อง',
+            'โจทย์อสมการจากงบประมาณจำกัด ให้หาจำนวนสูงสุดที่ซื้อได้',
+            'โจทย์พื้นที่รูปสี่เหลี่ยมที่กว้างและยาวต่างกันคงที่ ให้หาความยาวรอบรูป (ตั้งสมการกำลังสอง)',
+            'โจทย์พาราโบลาในสถานการณ์จริง (โครงเหล็กแขวน เก้าอี้ สะพานโค้ง) ให้หาความยาวคานที่ระดับความสูงหนึ่ง',
+            'โจทย์ตัดกระดาษแผ่นใหญ่เป็นชิ้นเล็ก ให้หาจำนวนแผ่นใหญ่ที่ต้องซื้ออย่างน้อยที่สุด (ต้องปัดขึ้นและห้ามต่อเศษ)'
+          ]}
+      ]},
+      { n:2, name:'การวัดและเรขาคณิต', count:69, inds:[
+        { code:'ค 2.1 ม.2/1 · ม.3/1', name:'พื้นที่ผิวของปริซึม ทรงกระบอก พีระมิด กรวย ทรงกลม', count:13,
+          curr:['พื้นที่ผิวและปริมาตร — ปริซึมและทรงกระบอก','พื้นที่ผิวและปริมาตร — พีระมิด กรวย ทรงกลม'],
+          arche:[
+            'กำหนดพื้นที่ผิว (ไม่รวมฐาน) ของพีระมิดหรือกรวย ให้ย้อนหาความสูงหรือความยาวส่วนประกอบอื่น',
+            'กำหนดปริมาตรและความสูงของทรงกระบอก ให้หาพื้นที่ผิวทั้งหมด',
+            'หาพื้นที่ผิวของรูปทรงตันที่ประกอบจากลูกบาศก์หนึ่งหน่วยหลายลูก (นับหน้าที่มองเห็น)',
+            'ทาสีรอบรูปทรงที่ประกอบจากลูกบาศก์ แล้วถามจำนวนลูกบาศก์ที่ถูกทาสีกี่หน้า',
+            'หาพื้นที่ผิวของรูปประกอบ เช่น ทรงกระบอกผ่าครึ่งคลุมพื้น หรือกรวยวางบนทรงกระบอก โดยหักส่วนที่เปิดโล่งออก',
+            'หลอมของแข็งก้อนหนึ่งเป็นทรงกลมสองลูก กำหนดรัศมีลูกหนึ่ง ให้หาพื้นที่ผิวของอีกลูก'
+          ]},
+        { code:'ค 2.1 ม.2/2 · ม.3/2', name:'ปริมาตรของปริซึม ทรงกระบอก พีระมิด กรวย ทรงกลม', count:12,
+          curr:['พื้นที่ผิวและปริมาตร — ปริซึมและทรงกระบอก','พื้นที่ผิวและปริมาตร — พีระมิด กรวย ทรงกลม'],
+          arche:[
+            'กรวยหรือของแข็งจมอยู่ในทรงกระบอกที่มีน้ำเต็มพอดี เมื่อนำออกให้หาระดับน้ำใหม่',
+            'กำหนดปริมาตรของแท่งวัสดุที่เจาะรูทรงกระบอกกลวง ให้หารัศมีของรู',
+            'กำหนดรูปคลี่ของปริซึม ให้ประกอบแล้วหาปริมาตร',
+            'เปรียบเทียบปริมาตรของปริซึมกับพีระมิดที่ฐานต่างกันแต่สูงเท่ากัน ตอบเป็นจำนวนเท่า',
+            'โจทย์อัตราการไหลผ่านหน้าตัดในเวลาที่กำหนด ให้หาปริมาตรน้ำทั้งหมด',
+            'กำหนดปริมาตรที่สูบออกและระดับน้ำที่ลดลง ให้หาความยาวด้านของถัง',
+            'โจทย์รูปประกอบหลายทรง (ถังน้ำบนฐานที่เป็นส่วนของวงกลม) ให้หาความจุของส่วนใดส่วนหนึ่ง'
+          ]},
+        { code:'ค 2.2 ม.1/2', name:'มิติสัมพันธ์ของรูปเรขาคณิตสองมิติและสามมิติ', count:9,
+          curr:['มิติสัมพันธ์ของรูปเรขาคณิต ม.1'],
+          arche:[
+            'กำหนดรูปสามมิติที่ประกอบจากลูกบาศก์ ให้พิจารณาว่าภาพด้านหน้า ด้านข้าง ด้านบน ข้อใดถูก',
+            'กำหนดภาพด้านหน้าและด้านข้าง ให้หาจำนวนลูกบาศก์ที่มากที่สุดที่เป็นไปได้',
+            'กำหนดภาพด้านบนที่เขียนตัวเลขแทนจำนวนลูกบาศก์ที่ซ้อนกัน ให้เลือกรูปสามมิติที่ตรงกัน',
+            'หยิบลูกบาศก์บางลูกออก แล้วให้เลือกภาพด้านหน้าและด้านข้างที่ได้',
+            'เปรียบเทียบรูปสามมิติสองรูป ว่าภาพด้านใดของทั้งสองเหมือนกัน',
+            'กำหนดภาพทั้งสามด้าน ให้หาจำนวนลูกบาศก์ทั้งหมด'
+          ]},
+        { code:'ค 2.2 ม.2/2 · ม.2/4 · ม.3/1', name:'เส้นขนาน ความเท่ากันทุกประการ และความคล้าย', count:18,
+          curr:['สมบัติของเส้นขนานและรูปสามเหลี่ยม ม.2','ความเท่ากันทุกประการ ม.2','ความคล้าย ม.3'],
+          arche:[
+            'จากแผนผังที่มีเส้นขนานสองเส้นตัดกันเป็นรูปสามเหลี่ยมซ้อน ให้หาพื้นที่ของรูปใหญ่ (ใช้อัตราส่วนความคล้าย)',
+            'กำหนดรูปสามเหลี่ยมคล้ายสองรูปพร้อมความยาวบางด้าน ให้พิจารณาว่าข้อสรุป ก. และ ข. ถูกหรือผิด',
+            'กำหนดอัตราส่วนความยาวด้านทั้งสามและความยาวรอบรูป ให้ตรวจสอบข้อความเกี่ยวกับด้าน',
+            'ลากส่วนสูงในรูปสามเหลี่ยม แล้วใช้พีทาโกรัสสองครั้งหาความยาวส่วนที่เหลือของฐาน',
+            'รูปหลายเหลี่ยมที่มีด้านคู่หนึ่งขนานกัน ให้หาผลบวกของขนาดมุมหลายมุม',
+            'พิจารณาว่าเงื่อนไขการกำหนดรูปสามเหลี่ยมแบบใดอาจได้รูปที่ไม่เท่ากันทุกประการ',
+            'รูปสี่เหลี่ยมด้านขนานสองรูปซ้อนกันพร้อมสามเหลี่ยมหน้าจั่ว ให้หาขนาดมุมที่โจทย์ถาม',
+            'โจทย์เงาหรือเสาสองต้นที่ขึงลวดไขว้กัน ให้หาความสูงของจุดตัด',
+            'กำหนดรูปคล้ายสองรูปและความยาวรอบรูปของรูปหนึ่ง ให้หาผลรวมของเศษส่วนของความยาวรอบรูปทั้งสอง'
+          ]},
+        { code:'ค 2.2 ม.2/3', name:'การแปลงทางเรขาคณิต', count:5,
+          curr:['การแปลงทางเรขาคณิต ม.2'],
+          arche:[
+            'กำหนดรูปต้นแบบและภาพบนระนาบพิกัด ให้เลือกลำดับขั้นตอนการแปลงที่ทำให้เกิดภาพนั้น',
+            'ให้เลือกว่าการแปลงข้อใดไม่ทำให้เกิดภาพที่กำหนด',
+            'ทำการแปลงหลายขั้นต่อกัน (เลื่อนขนานแล้วหมุน หรือสะท้อนแล้วสะท้อน) ให้หาพิกัดสุดท้าย',
+            'พิจารณาข้อความเกี่ยวกับพิกัดหลังการสะท้อนหรือเลื่อนขนาน ว่าข้อใดไม่ถูกต้อง',
+            'กำหนดสามจุด ให้หาการเลื่อนขนานที่ทำให้เกิดรูปสามเหลี่ยมหน้าจั่ว'
+          ]},
+        { code:'ค 2.2 ม.2/5 · ม.3/2', name:'ทฤษฎีบทพีทาโกรัสและอัตราส่วนตรีโกณมิติ', count:8,
+          curr:['ทฤษฎีบทพีทาโกรัส ม.2','อัตราส่วนตรีโกณมิติ ม.3'],
+          arche:[
+            'พับกระดาษรูปสี่เหลี่ยมผืนผ้าตามแนวเส้นทแยง ให้หาความยาวของส่วนที่เกิดขึ้น (ตั้งสมการพีทาโกรัส)',
+            'มองยอดตึกจากสองตำแหน่งที่ห่างกันเป็นระยะที่กำหนด มุมเงย 30° และ 60° ให้หาความสูงของตึก',
+            'ยืนบนดาดฟ้าตึกหนึ่งมองยอดอีกตึก มุมเงยเปลี่ยนจาก 45° เป็น 30° ให้หาความสูงของตึกที่ยืน',
+            'บันไดพาดกำแพงทำมุมกับผนังในแนวตั้ง ให้หาระยะจากฐานกำแพง (ระวังว่ามุมวัดจากผนัง ไม่ใช่จากพื้น)',
+            'เดินทางไปทางทิศเหนือแล้วเลี้ยวไปทางทิศตะวันออก ให้หาระยะทางตรงจากจุดเริ่มต้น',
+            'มองเรือจากหน้าผาเป็นมุมก้ม ให้หาระยะทางตามแนวราบ',
+            'หมุนจุดรอบจุดกำเนิดเป็นมุมที่กำหนด แล้วให้หาพื้นที่ของรูปสามเหลี่ยมที่เกิดขึ้น'
+          ]},
+        { code:'ค 2.2 ม.3/3', name:'ทฤษฎีบทเกี่ยวกับวงกลม', count:4,
+          curr:['ทฤษฎีบทเกี่ยวกับวงกลม'],
+          arche:[
+            'กำหนดคอร์ดและมุมในส่วนโค้ง ให้หาความยาวส่วนโค้งที่โจทย์ถาม',
+            'กำหนดมุมที่จุดศูนย์กลางและมุมในส่วนโค้ง ให้หาขนาดมุมที่เกิดจากเส้นตัดวงกลม',
+            'หาพื้นที่ส่วนที่แรเงาซึ่งประกอบจากส่วนของวงกลมและรูปหลายเหลี่ยม',
+            'เข็มนาฬิกาหมุนในเวลาที่กำหนด ให้หาความยาวเส้นทางที่ปลายเข็มเคลื่อนที่'
+          ]}
+      ]},
+      { n:3, name:'สถิติและความน่าจะเป็น', count:46, inds:[
+        { code:'ค 3.1 ม.1/1 · ม.2/1 · ม.3/1', name:'การนำเสนอข้อมูล ค่ากลาง และแผนภาพกล่อง', count:31,
+          curr:['สถิติ — การนำเสนอข้อมูล ม.1','สถิติ — แผนภาพจุด ต้น-ใบ ฮิสโทแกรม','สถิติ — แผนภาพกล่อง'],
+          arche:[
+            'กราฟเส้นแสดงอัตราแลกเปลี่ยนหรือราคาสินค้าย้อนหลัง ให้ตัดสินว่าข้อความเรื่องกำไร–ขาดทุนข้อใดถูกต้องแน่นอน',
+            'กราฟเส้นแบบขั้นบันไดของค่าบริการตามน้ำหนัก ให้หาค่าบริการรวมของหลายรายการ',
+            'แผนภูมิรูปวงกลมแสดงร้อยละ กำหนดค่าจริงของส่วนหนึ่ง ให้หาค่าจริงของอีกส่วนหรือยอดรวม',
+            'แผนภูมิแท่งเปรียบเทียบหลายปีหลายวิชา ให้หาว่าค่าเฉลี่ยของรายการใดมากที่สุด',
+            'ตารางแจกแจงความถี่ ให้ตัดสินว่าข้อความเกี่ยวกับจำนวนในแต่ละช่วงข้อใดถูก',
+            'กำหนดข้อมูลในรูป $a, a+1, a+2, \\\\ldots$ ให้หาส่วนเบี่ยงเบนมาตรฐาน',
+            'กำหนดค่าเฉลี่ยของสองกลุ่มย่อยและจำนวนคนของแต่ละกลุ่ม ให้หาค่าเฉลี่ยรวมหรือค่าเฉลี่ยของกลุ่มที่เหลือ',
+            'กำหนดค่าเฉลี่ยแล้วตัดข้อมูลค่าน้อยที่สุดออก ให้หาค่าที่ถูกตัด',
+            'กำหนดว่าสองชุดข้อมูลมีฐานนิยมและมัธยฐานเท่ากัน ให้หาผลบวกของค่าที่หายไป',
+            'กำหนดจำนวนข้อมูลพร้อมฐานนิยม มัธยฐาน และพิสัย ให้หาผลบวกของข้อมูลทั้งชุดหรือค่าสุดขั้ว',
+            'แผนภาพกล่อง ให้อ่านค่าต่ำสุด สูงสุด $Q_1$ $Q_2$ $Q_3$ แล้วเลือกข้อความที่ถูกต้อง',
+            'แผนภูมิแท่งที่ข้อมูลไม่ครบพร้อมค่าเฉลี่ยที่ทราบ ให้เติมค่าที่ขาดแล้วหามัธยฐาน',
+            'โจทย์สองปริมาณที่ต่างกันคงที่พร้อมค่าเฉลี่ยรวม ให้หาปริมาณที่น้อยกว่า',
+            'กราฟความสัมพันธ์ระหว่างอุณหภูมิกับเวลาที่มีหลายช่วงความชัน ให้อ่านค่าที่เวลาหนึ่ง'
+          ]},
+        { code:'ค 3.2 ม.3/1', name:'ความน่าจะเป็นของเหตุการณ์', count:15,
+          curr:['ความน่าจะเป็น ม.3'],
+          arche:[
+            'หยิบบัตรหรือสลากที่เขียนหมายเลขกำกับครั้งละสองใบ ให้หาความน่าจะเป็นที่ผลบวกหรือผลคูณเป็นค่าที่กำหนด',
+            'สุ่มเลือกคนจากกลุ่มที่มีชายและหญิง ให้หาความน่าจะเป็นที่ได้ชายหนึ่งหญิงหนึ่ง',
+            'หมุนแป้นสองแป้นพร้อมกัน ให้หาจำนวนแบบหรือความน่าจะเป็นที่ผลบวกมีสมบัติที่กำหนด',
+            'หยิบลูกกวาดหรือลูกบอลสองเม็ดพร้อมกันจากถุงที่มีหลายสี ให้หาความน่าจะเป็นที่ได้คนละสี',
+            'โยนเหรียญหลายครั้ง ให้หาความน่าจะเป็นที่ออกก้อยไม่เกินจำนวนที่กำหนด',
+            'กำหนดความน่าจะเป็นของสีหนึ่ง ให้ย้อนหาจำนวนลูกบอลของอีกสีหนึ่ง',
+            'หยิบแบบไม่ใส่คืน กำหนดผลของสองครั้งแรก ให้หาความน่าจะเป็นของครั้งที่สาม',
+            'กำหนดงบประมาณรวมและจำนวนซองรางวัลบางชนิด ให้หาจำนวนซองที่เหลือแล้วหาความน่าจะเป็น',
+            'ตารางหรือรูปที่ปิดทับบางช่อง ให้หาความน่าจะเป็นที่เปิดแล้วพบสิ่งที่กำหนด',
+            'หาความน่าจะเป็นของคอมพลีเมนต์ เช่น "ไม่ใช่" ประเภทหนึ่งจากทั้งหมดหลายประเภท',
+            'นำบัตรเลขโดดมาเรียงเป็นจำนวนหลายหลักภายใต้เงื่อนไขค่าของจำนวน ให้นับจำนวนแบบที่เป็นไปได้'
+          ]}
+      ]}
+    ]
+  }
+};
+
+/* ── ตัวช่วย ─────────────────────────────────────────────────────── */
+function onetOf(grade){ return ONET[grade] || null; }
+function onetInds(grade){
+  const o = onetOf(grade); if(!o) return [];
+  return o.strands.reduce((a,s)=>a.concat(s.inds.map(i=>Object.assign({strand:s.n, strandName:s.name}, i))), []);
+}
+/* จับคู่ตัวชี้วัด O-NET กับบทในหลักสูตรที่ผู้ใช้เลือก */
+function onetForTopic(grade, topic){
+  if(!topic) return null;
+  return onetInds(grade).find(i => i.curr && i.curr.indexOf(topic) >= 0) || null;
+}
+/* สัดส่วนข้อของแต่ละตัวชี้วัด เมื่อออกข้อสอบ n ข้อทั้งระดับชั้น */
+function onetPlan(grade, n){
+  const inds = onetInds(grade); if(!inds.length) return [];
+  const tot = inds.reduce((a,i)=>a+i.count, 0);
+  const raw = inds.map(i => ({ ind:i, exact: n * i.count / tot }));
+  const out = raw.map(r => ({ ind:r.ind, n: Math.floor(r.exact) }));
+  let left = n - out.reduce((a,x)=>a+x.n, 0);
+  raw.map((r,idx)=>({idx, frac: r.exact - Math.floor(r.exact)}))
+     .sort((a,b)=> b.frac - a.frac)
+     .forEach(x => { if(left > 0){ out[x.idx].n++; left--; } });
+  return out.filter(x => x.n > 0);
+}
+function onetBlock(grade, topic){
+  const o = onetOf(grade); if(!o) return '';
+  const hit = onetForTopic(grade, topic);
+  let h = `\n【พิมพ์เขียวข้อสอบ O-NET จริง (${o.label} ปี ${o.years} · วิเคราะห์จาก ${o.total} ข้อ)】`;
+  if(hit){
+    h += `\nตัวชี้วัดที่ตรงกับบทนี้: ${hit.code} ${hit.name} — พบในข้อสอบเก่า ${hit.count} ข้อ `
+       + `(คิดเป็น ${Math.round(hit.count / o.total * 100)}% ของข้อสอบทั้งฉบับ)`
+       + `\nแม่พิมพ์โจทย์ที่ O-NET ใช้จริงกับตัวชี้วัดนี้ — ให้ออกโจทย์ "ใหม่" ตามแบบเหล่านี้\n`
+       + hit.arche.map((x,i)=>`  แบบ ${i+1}. ${x}`).join('\n');
+  } else {
+    h += '\nสัดส่วนตัวชี้วัดที่ข้อสอบจริงให้น้ำหนัก:\n'
+       + o.strands.map(s => `  สาระที่ ${s.n} ${s.name} — ${Math.round(s.count/o.total*100)}%`).join('\n');
+  }
+  h += `\n\n【ลักษณะเฉพาะของข้อสอบ O-NET ที่ต้องทำตาม】
+• ตัวเลือกใช้ตัวเลข "1. 2. 3. 4." (ไม่ใช่ ก ข ค ง) และทุกตัวเลือกต้องเขียนหน่วยกำกับซ้ำทุกข้อ เช่น "1. 308 ตารางนิ้ว"
+• ประมาณ ${Math.round(o.freeRatio*100)}% ของข้อเป็นแบบ "เติมคำตอบ" ไม่มีตัวเลือก ปิดท้ายด้วยบรรทัด "ตอบ ....................."
+• โจทย์ต้องอยู่ในบริบทชีวิตจริงที่วัดได้ (โรงเรียน ร้านค้า ที่ดิน ถังน้ำ บรรจุภัณฑ์ อัตราแลกเปลี่ยน การเดินทาง) ไม่ใช่โจทย์คำนวณล้วน
+• หลายข้อวัดมากกว่าหนึ่งตัวชี้วัดพร้อมกัน เช่น ต้องใช้พีทาโกรัสก่อนแล้วจึงหาพื้นที่ผิว
+• ตัวเลือกลวงต้องมาจากความเข้าใจผิดที่เกิดขึ้นจริง เช่น ลืมหักส่วนที่เปิดโล่ง ใช้สูตรปริมาตรแทนพื้นที่ผิว ลืมคูณ ⅓ ของพีระมิด ปัดเศษลงแทนที่จะปัดขึ้น
+• เมื่อโจทย์ต้องใช้ π ให้กำหนดไว้ในโจทย์ว่า $\\\\pi \\\\approx \\\\frac{22}{7}$ หรือ 3.14
+• มีข้อแบบ "พิจารณาข้อความ ก. และ ข. แล้วเลือกว่าข้อใดถูกข้อใดผิด" และข้อแบบ "ข้อใดไม่ถูกต้อง" ปนอยู่ด้วย`;
+  return h;
+}
+function hasOnet(grade){ return !!ONET[grade]; }
+function setLayout(v){
+  CFG.layout = (v==='contest') ? 'contest' : 'compact';
+  saveCfg();
+  const cur = window.__lastExam;
+  if(cur) paintExam(cur.rec, cur.opt);
+  toast(CFG.layout==='contest' ? 'จัดหน้าแบบแนวแข่งขัน 3 ข้อ/หน้า' : 'จัดหน้าแบบประหยัดกระดาษ');
+}
 function paintBookPick(){
   const host = document.getElementById('bookPick'); if(!host) return;
   const rows = GRADES.filter(g => volChoices(g).length > 1);
@@ -3536,7 +3792,7 @@ const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
   key:'', pass:'', url:'', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
-  teacher:'', school:'', term:'', books:{}
+  teacher:'', school:'', term:'', books:{}, layout:'compact'
 };
 let CFG = Object.assign({}, CFG_DEF);
 
@@ -3893,10 +4149,20 @@ function dateFmt(ts){
 }
 function topicsOf(g){ return (CURRICULUM[g]||[]); }
 function findTopic(g, name){ return topicsOf(g).find(t=>t.topic===name) || null; }
+/* HTML ต้นฉบับ (ยังเป็น LaTeX ดิบ) ของกระดาษแต่ละแผ่น
+   จำเป็นสำหรับการพิมพ์/บันทึก เพราะ MathJax แปลงสูตรเป็น SVG ที่อ้างอิง
+   ตารางฟอนต์ในหน้านี้ ถ้าคัดลอกไปหน้าต่างอื่นสูตรจะกลายเป็นช่องว่าง */
+const RAWHTML = {};
 function renderMath(el){
+  if(el && el.id) RAWHTML[el.id] = el.innerHTML;
   if(window.MathJax && MathJax.typesetPromise){
     MathJax.typesetPromise([el]).catch(()=>{});
   }
+}
+function sheetHTML(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  return RAWHTML[id] || el.innerHTML;
 }
 /* ════════════════════════════════════════════════════════════════════
    DOCUMENT STUDIO — คลังเอกสาร ป.1–ม.6
@@ -4286,7 +4552,7 @@ const EXAM_TYPES = {
      brief:'ข้อสอบปลายภาคเรียน ครอบคลุมทุกหน่วยการเรียนรู้ของภาคเรียน ต้องมีข้อวัดการวิเคราะห์และการแก้ปัญหาไม่น้อยกว่า 30% เรียงข้อจากง่ายไปยาก'}
   ],
   tutor:[
-    {id:'onet',  name:'แนว O-NET',   hint:'ป.6 / ม.3 / ม.6', n:20, scope:'grade',
+    {id:'onet',  name:'แนว O-NET',   hint:'ป.6 / ม.3 / ม.6', n:20, scope:'grade', fmt:'mcq4num',
      brief:'ข้อสอบแนว O-NET ของ สทศ. ลักษณะเด่นคือ โจทย์อยู่ในบริบทชีวิตจริง ใช้ข้อมูลจากตาราง แผนภูมิ หรือสถานการณ์ ต้องอ่านและตีความก่อนคำนวณ วัดหลายตัวชี้วัดพร้อมกันในข้อเดียว มีข้อที่ต้องเลือกคำตอบที่ถูกต้องที่สุดจากตัวเลือกที่ใกล้เคียงกัน และมีข้อแบบเลือกตอบเชิงซ้อน (ถูก/ผิด หลายประเด็นในข้อเดียว) ประมาณ 20%'},
     {id:'tedet', name:'แนว TEDET',   hint:'คิดวิเคราะห์เชิงลึก', n:15, scope:'grade',
      brief:'ข้อสอบแนว TEDET (โครงการประเมินและพัฒนาสู่ความเป็นเลิศทางคณิตศาสตร์และวิทยาศาสตร์) ลักษณะเด่นคือ เน้นการคิดสร้างสรรค์และการให้เหตุผลเชิงคณิตศาสตร์ โจทย์มักเป็นสถานการณ์แปลกใหม่ที่ไม่เคยเห็นในหนังสือเรียน ต้องมองหาแบบรูป (pattern) หรือคิดย้อนกลับ แต่ใช้ความรู้พื้นฐานในระดับชั้นนั้นเท่านั้น ห้ามใช้สูตรของชั้นที่สูงกว่า ควรมีข้อที่ต้องนับอย่างเป็นระบบ ข้อที่เกี่ยวกับตรรกะและการอนุมาน และข้อเรขาคณิตเชิงมองภาพ'},
@@ -4320,6 +4586,7 @@ function pickExamType(id){
   document.querySelectorAll('#examTypeGrid .dt').forEach(b=>b.classList.toggle('on', b.dataset.et===id));
   const t = curExamType();
   document.getElementById('eCount').value = t.n;
+  if(t.fmt) document.getElementById('eFormat').value = t.fmt;
   if(t.id==='onet' || t.id==='alevel'){
     document.getElementById('eEasy').value=25; document.getElementById('eMed').value=45; document.getElementById('eHard').value=30;
   } else if(t.id==='tedet' || t.id==='comp'){
@@ -4469,10 +4736,12 @@ function itemPrompt(p, group, n){
   const et = curExamType();
   const fmtTxt = {
     mcq4:'ปรนัย 4 ตัวเลือก (ก ข ค ง)', mcq5:'ปรนัย 5 ตัวเลือก (1 2 3 4 5)',
+    mcq5abc:'ปรนัย 5 ตัวเลือก (A B C D E) แนวข้อสอบแข่งขัน',
+    mcq4num:'ปรนัย 4 ตัวเลือก (1 2 3 4) แนว O-NET',
     short:'เติมคำตอบสั้น (ไม่มีตัวเลือก)', show:'แสดงวิธีทำ (อัตนัย)',
     mix:'ปรนัย 4 ตัวเลือกเป็นหลัก'
   }[p.fmt] || 'ปรนัย 4 ตัวเลือก';
-  const nCh = p.fmt==='mcq5' ? 5 : 4;
+  const nCh = (p.fmt==='mcq5'||p.fmt==='mcq5abc') ? 5 : 4;
   const wantCh = (p.fmt==='short'||p.fmt==='show') ? false : true;
 
   return `คุณคือผู้ออกข้อสอบคณิตศาสตร์ระดับชาติของไทย มีความแม่นยำสูงมาก
@@ -4488,7 +4757,7 @@ ${et.brief}
 ⛔ เพดานความยาก ห้ามเกินเด็ดขาด: ${t.bounds}
 สาระย่อยที่ต้องวัด: ${group.sub || t.subs.join(' / ')}
 
-${bookBlock(p.grade, t.topic, group.sub)}${archeBlock(p.grade, t.topic)}
+${bookBlock(p.grade, t.topic, group.sub)}${archeBlock(p.grade, t.topic)}${p.etype==='onet' ? onetBlock(p.grade, t.topic) : ''}
 ${houseStyle(p.grade)}
 
 ระดับความยากของทุกข้อในชุดนี้: ${group.level}
@@ -4524,7 +4793,7 @@ function validItem(q, p){
   if(!q.explain || String(q.explain).trim().length < 10) return false;
   const wantCh = !(p.fmt==='short'||p.fmt==='show');
   if(wantCh){
-    const n = p.fmt==='mcq5' ? 5 : 4;
+    const n = (p.fmt==='mcq5'||p.fmt==='mcq5abc') ? 5 : 4;
     if(!Array.isArray(q.choices) || q.choices.length!==n) return false;
     if(typeof q.ans!=='number' || q.ans<0 || q.ans>=n) return false;
     const set = new Set(q.choices.map(c=>String(c).trim()));
@@ -4718,9 +4987,14 @@ function examProgress(on, txt, pct, sub){
 /* ── วาดกระดาษข้อสอบ ── */
 function paintExam(rec, opt){
   opt = opt||{};
+  window.__lastExam = {rec:rec, opt:opt};
   const d = rec.data, p = d.params, items = d.items;
-  const nCh = p.fmt==='mcq5'?5:4;
-  const LT = p.fmt==='mcq5' ? ['1','2','3','4','5'] : ['ก','ข','ค','ง'];
+  const nCh = (p.fmt==='mcq5'||p.fmt==='mcq5abc')?5:4;
+  const LT = p.fmt==='mcq5abc' ? ['A','B','C','D','E']
+           : p.fmt==='mcq5'    ? ['1','2','3','4','5']
+           : p.fmt==='mcq4num' ? ['1','2','3','4']
+           :                     ['ก','ข','ค','ง'];
+  const layout = CFG.layout==='contest' ? 'contest' : 'compact';
   const et = (EXAM_TYPES.school.concat(EXAM_TYPES.tutor)).find(x=>x.id===p.etype) || {name:'ข้อสอบ'};
 
   const stamp = opt.reused
@@ -4748,20 +5022,28 @@ function paintExam(rec, opt){
       : 'ให้นักเรียนเลือกคำตอบที่ถูกต้องที่สุดเพียงคำตอบเดียว'} เวลา ${Math.max(20, Math.round(items.length*2))} นาที</p>
   <hr>`;
 
+  const PER_PAGE = 3;
   items.forEach((q,i)=>{
-    h += `<div class="qitem"><span class="qnum">${i+1}.</span> ${q.q}`;
+    const contest = layout==='contest';
+    h += `<div class="qitem${contest?' qcontest':''}"><span class="qnum">${i+1}.</span> ${q.q}`;
     if(Array.isArray(q.choices)){
-      h += `<div class="qch">` + q.choices.map((c,k)=>`<div>${LT[k]||k+1}. ${c}</div>`).join('') + `</div>`;
+      const cls = contest ? 'qch qch3' : 'qch';
+      h += `<div class="${cls}">` + q.choices.map((c,k)=>`<div>${LT[k]||k+1}. ${c}</div>`).join('') + `</div>`;
+      if(contest) h += `<div class="qwork"></div>`;
     } else {
-      h += `<br><br>วิธีทำ ................................................................................<br><br>
+      h += contest
+        ? `<div class="qwork qwork-lined"><span class="worklbl">วิธีทำ</span></div>
+           <div class="qans">ตอบ ................................................................</div>`
+        : `<br><br>วิธีทำ ................................................................................<br><br>
             ................................................................................<br><br>
             ตอบ ..............................................`;
     }
     h += `</div>`;
+    if(contest && (i+1)%PER_PAGE===0 && i+1<items.length) h += `<div class="pgbreak"></div>`;
   });
 
   /* ── เฉลย ── */
-  let key = `<div id="examKeyBlock"><hr><h2>เฉลยและแนวการให้คะแนน</h2>`;
+  let key = `<div id="examKeyBlock">${layout==='contest'?'<div class="pgbreak"></div>':'<hr>'}<h2>เฉลยและแนวการให้คะแนน</h2>`;
   if(Array.isArray(items[0]&&items[0].choices)){
     key += `<p><strong>ตารางคำตอบ</strong></p><table><tr>` +
       items.map((q,i)=>`<th>${i+1}</th>`).join('') + `</tr><tr>` +
@@ -5188,15 +5470,25 @@ function openModal(title, body, foot){
 }
 function closeModal(){ document.getElementById('modal').classList.remove('on'); }
 
-function printSheet(id){
+function printSheet(id, mode){
   const el = document.getElementById(id);
   if(!el || !el.innerHTML.trim() || el.querySelector('.empty')){ toast('ยังไม่มีเนื้อหาให้พิมพ์'); return; }
   const w = window.open('', '_blank');
-  w.document.write(printShell(el.innerHTML));
+  if(!w){ toast('เบราว์เซอร์บล็อกหน้าต่างใหม่ กรุณาอนุญาต pop-up'); return; }
+  w.document.write(printShell(sheetHTML(id), mode==='pdf'));
   w.document.close();
 }
-function printShell(inner){
+function savePDF(id){
+  const el = document.getElementById(id);
+  if(!el || !el.innerHTML.trim() || el.querySelector('.empty')){ toast('ยังไม่มีเนื้อหาให้บันทึก'); return; }
+  toast('ในหน้าต่างพิมพ์ ให้เลือกปลายทางเป็น "บันทึกเป็น PDF"');
+  printSheet(id, 'pdf');
+}
+function printShell(inner, asPdf){
   const SC='<scr'+'ipt', SE='</scr'+'ipt>';
+  const banner = asPdf
+    ? '<div class="pdfhint">เลือกปลายทาง (Destination) เป็น <b>บันทึกเป็น PDF / Save as PDF</b> แล้วกดบันทึก · แถบนี้จะไม่ติดไปในไฟล์</div>'
+    : '';
   return `<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
 <title>SAMATH STUDIO</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
@@ -5211,14 +5503,23 @@ th{background:#f0f3f2;}
 ul,ol{margin:8px 0 8px 22px;} li{margin:3px 0;}
 .qitem{margin:12px 0;page-break-inside:avoid;} .qnum{font-weight:700;}
 .qch{margin:5px 0 0 20px;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;}
+.qch3{grid-template-columns:repeat(3,1fr);gap:3px 12px;}
+.qcontest{margin:0 0 10px;padding-top:10px;page-break-inside:avoid;}
+.qwork{min-height:26mm;margin:8px 0 4px;}
+.qwork-lined{min-height:34mm;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 7.5mm,#ddd 7.5mm,#ddd calc(7.5mm + 1px));}
+.worklbl{font-size:12px;color:#666;}
+.qans{border-top:1px solid #bbb;padding-top:5px;font-size:14px;}
+.pgbreak{page-break-after:always;height:0;}
 .ansbox{background:#f7f9f8;border-left:3px solid #a8791f;padding:8px 12px;margin:8px 0;page-break-inside:avoid;}
 .docmeta{font-size:12.5px;color:#555;border-bottom:1px solid #ccc;padding-bottom:8px;margin-bottom:14px;}
 .stampmark{display:inline-block;border:2px solid #b8372c;color:#b8372c;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;margin-bottom:10px;}
 hr{border:none;border-top:1px solid #bbb;margin:16px 0;}
+.pdfhint{background:#fff6df;border:1px solid #a8791f;color:#6b4d0e;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:14px;}
+@media print{.pdfhint{display:none!important;}}
 </style>
-${SC}>window.MathJax={tex:{inlineMath:[['$','$']]},svg:{fontCache:'global'},startup:{pageReady(){return MathJax.startup.defaultPageReady().then(()=>setTimeout(()=>window.print(),450));}}};${SE}
+${SC}>window.MathJax={tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']]},svg:{fontCache:'local'},startup:{pageReady(){return MathJax.startup.defaultPageReady().then(()=>setTimeout(()=>window.print(),450));}}};${SE}
 ${SC} src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">${SE}
-</head><body>${inner}</body></html>`;
+</head><body>${banner}${inner}</body></html>`;
 }
 function exportWord(id){
   const el = document.getElementById(id);
@@ -5227,8 +5528,13 @@ function exportWord(id){
 <style>body{font-family:'TH Sarabun New','IBM Plex Sans Thai',sans-serif;font-size:16pt;line-height:1.5;}
 h1{font-size:20pt;} h2{font-size:18pt;} h3{font-size:16pt;}
 table{border-collapse:collapse;width:100%;} th,td{border:1px solid #666;padding:5pt;}
-.ansbox{background:#f4f4f4;border-left:3pt solid #a8791f;padding:6pt;}.bookref{color:#7a5a14;font-size:9pt;}</style></head>
-<body>${el.innerHTML.replace(/<div class="stampmark">[\s\S]*?<\/div>/,'')}</body></html>`;
+.ansbox{background:#f4f4f4;border-left:3pt solid #a8791f;padding:6pt;}.bookref{color:#7a5a14;font-size:9pt;}
+.qcontest{padding-top:8pt;}
+.qwork{height:70pt;}
+.qwork-lined{height:95pt;}
+.qans{border-top:1pt solid #bbb;padding-top:4pt;}
+.pgbreak{page-break-after:always;height:0;}</style></head>
+<body>${sheetHTML(id).replace(/<div class="stampmark">[\s\S]*?<\/div>/,'')}</body></html>`;
   const blob = new Blob(['\ufeff', html], {type:'application/msword'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -5273,6 +5579,7 @@ function startApp(){
 window.addEventListener('DOMContentLoaded', ()=>{
   loadCfg();
   BANK._load();
+  const lay=document.getElementById('eLayout'); if(lay) lay.value = CFG.layout||'compact';
   document.getElementById('modal').addEventListener('click', e=>{ if(e.target.id==='modal') closeModal(); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
   ['gKey','gPass'].forEach(id=>{
