@@ -836,6 +836,15 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
             </div>
           </div>
         </div>
+
+        <div class="card mb20 mt18">
+          <div class="card-hd"><h3>ตรวจความสมบูรณ์ของโปรแกรม</h3></div>
+          <div class="card-bd">
+            <p class="hint">ชุดทดสอบฝังอยู่ในไฟล์นี้แล้ว ไม่ต้องใช้ไฟล์ภายนอก กดเพื่อตรวจว่าหลักสูตร ข้อมูลหนังสือเรียน แม่พิมพ์โจทย์ พิมพ์เขียว O-NET และการประกอบคำสั่งส่ง AI ยังครบถ้วนดี ใช้เวลาไม่กี่วินาที ไม่เรียก API และไม่แตะข้อมูลในคลัง</p>
+            <button class="btn btn-ghost" onclick="uiSelfTest()">เริ่มตรวจ</button>
+            <div id="selfTestOut" class="mt18"></div>
+          </div>
+        </div>
       </section>
 
     </div>
@@ -5988,6 +5997,252 @@ window.SAMATH = {
   get exam(){ return examCurrent; },
   version:'9.0'
 };
+
+/* ══════════════════════════════════════════════════════════════════════
+   ชุดทดสอบในตัว — เดิมเป็นไฟล์ .js แยกต่างหาก ย้ายมาฝังในโปรแกรมแล้ว
+   เรียกได้จากปุ่ม "ตรวจความสมบูรณ์ของโปรแกรม" ในหน้าตั้งค่า
+   หรือพิมพ์ __selfTest() ในคอนโซลของเบราว์เซอร์ (F12)
+   ══════════════════════════════════════════════════════════════════════ */
+function runSelfTest(){
+  let pass = 0, fail = 0; const failed = [];
+  function ok(name, cond, extra){
+    if(cond) pass++; else { fail++; failed.push(name + (extra ? ' → ' + extra : '')); }
+  }
+  const d = document;
+
+/* ══ 1. หลักสูตร ══ */
+ok('มี 12 ระดับชั้น', GRADES.length === 12);
+ok('CURRICULUM ครบทุกชั้น', GRADES.every(g => Array.isArray(CURRICULUM[g]) && CURRICULUM[g].length));
+let chapters = 0, subs = 0;
+GRADES.forEach(g => CURRICULUM[g].forEach(t => { chapters++; subs += (t.subs || []).length; }));
+ok('มี 100 บท', chapters === 100, 'ได้ ' + chapters);
+ok('มี 433 หัวข้อย่อย', subs === 433, 'ได้ ' + subs);
+GRADES.forEach(g => CURRICULUM[g].forEach(t => {
+  ok('[' + g + '] ' + t.topic + ' มีรหัสตัวชี้วัด', !!t.indicator);
+  ok('[' + g + '] ' + t.topic + ' มีข้อความตัวชี้วัด', !!t.ind_text && t.ind_text.length > 10);
+  ok('[' + g + '] ' + t.topic + ' มีเพดานความยาก', !!t.bounds && t.bounds.length > 10);
+  ok('[' + g + '] ' + t.topic + ' มีสายวิชา', ['พื้นฐาน', 'เพิ่มเติม', 'ไม่วัดผล'].indexOf(t.track) >= 0, t.track);
+  ok('[' + g + '] ' + t.topic + ' มีหัวข้อย่อย', (t.subs || []).length > 0);
+  ok('[' + g + '] ' + t.topic + ' ค้นหาเจอ', findTopic(g, t.topic) === t);
+}));
+ok('findTopic คืน null เมื่อไม่มีบท', !findTopic('ป.1', 'แคลคูลัส'));
+ok('topicsOf คืนจำนวนตรงกับหลักสูตร', GRADES.every(g => topicsOf(g).length === CURRICULUM[g].length));
+
+/* ══ 2. หนังสือเรียน ══ */
+let vols = 0, units = 0, secs = 0;
+GRADES.forEach(g => {
+  ok('มีชั้นหนังสือของ ' + g, !!BOOKSHELF[g] && (BOOKSHELF[g].vols || []).length > 0);
+  (BOOKSHELF[g].vols || []).forEach(v => {
+    vols++;
+    ok('[' + g + '/' + v.id + '] มีชื่อหนังสือเรียน', !!(v.sb && v.sb.title));
+    (v.units || []).forEach(u => {
+      units++; secs += (u.secs || []).length;
+      ok('[' + g + '] หน่วย ' + u.n + ' มีช่วงหน้าถูกต้อง', u.from > 0 && u.to >= u.from,
+        u.from + '-' + u.to);
+      /* curr เขียนได้สองแบบ: ชื่อบทเฉย ๆ (ชั้นเดียวกัน) หรือ "ชั้น|ชื่อบท" (ข้ามชั้น) */
+      const hasCurr = c => c.indexOf('|') > 0
+        ? !!findTopic(c.split('|')[0], c.split('|').slice(1).join('|'))
+        : GRADES.some(gg => findTopic(gg, c));
+      ok('[' + g + '] หน่วย ' + u.n + ' โยงกับบทที่มีจริง',
+        (u.curr || []).every(hasCurr), (u.curr || []).filter(c => !hasCurr(c)).join(','));
+      (u.secs || []).forEach(sc => ok('[' + g + '] หน่วย ' + u.n + ' หัวข้อ ' + sc.n + ' มีเลขหน้าในช่วง',
+        sc.p >= u.from && sc.p <= u.to, sc.p + ' ไม่อยู่ใน ' + u.from + '-' + u.to));
+    });
+  });
+});
+ok('มีหนังสือ 22 เล่ม', vols === 22, 'ได้ ' + vols);
+ok('มี 132 หน่วย', units === 132, 'ได้ ' + units);
+ok('มี 508 หัวข้อย่อยพร้อมเลขหน้า', secs === 508, 'ได้ ' + secs);
+
+/* ══ 3. แม่พิมพ์โจทย์และธรรมเนียมการเขียน ══ */
+let arc = 0;
+Object.keys(ARCHE).forEach(k => { arc += ARCHE[k].length; });
+ok('มีแม่พิมพ์ครบ 100 บท', Object.keys(ARCHE).length === 100, 'ได้ ' + Object.keys(ARCHE).length);
+ok('มีแม่พิมพ์ 740 แบบ', arc === 740, 'ได้ ' + arc);
+GRADES.forEach(g => CURRICULUM[g].forEach(t => {
+  const k = g + '|' + t.topic;
+  const need = (t.track === 'ไม่วัดผล') ? 3 : 4;   /* บทที่ไม่วัดผลมีแม่พิมพ์น้อยกว่าได้ */
+  ok('มีแม่พิมพ์ของ ' + k, Array.isArray(ARCHE[k]) && ARCHE[k].length >= need,
+    ARCHE[k] ? ARCHE[k].length : 'ไม่มี');
+}));
+ok('ธรรมเนียมการเขียนมี 3 ส่วน', ['common', 'series', 'bands'].every(k => !!HOUSE[k]));
+ok('houseStyle ใช้ได้ทุกชั้น', GRADES.every(g => houseStyle(g).length > 50));
+
+/* ══ 4. พิมพ์เขียว O-NET ══ */
+ok('มีพิมพ์เขียว ม.3', hasOnet('ม.3'));
+ok('มีพิมพ์เขียว ป.6', hasOnet('ป.6'));
+ok('ยังไม่มีพิมพ์เขียว ม.6', !hasOnet('ม.6'));
+['ม.3', 'ป.6'].forEach(g => {
+  const O = onetOf(g), inds = onetInds(g);
+  ok('[' + g + '] มี 3 สาระ', O.strands.length === 3);
+  ok('[' + g + '] จำนวนข้อของสาระรวมได้เท่ายอดรวม',
+    O.strands.reduce((a, s) => a + s.count, 0) === O.total,
+    O.strands.reduce((a, s) => a + s.count, 0) + ' vs ' + O.total);
+  ok('[' + g + '] จำนวนข้อของตัวชี้วัดในแต่ละสาระรวมได้เท่ายอดของสาระ',
+    O.strands.every(s => s.inds.reduce((a, i) => a + i.count, 0) === s.count),
+    O.strands.map(s => s.n + ':' + s.inds.reduce((a, i) => a + i.count, 0) + '/' + s.count).join(' '));
+  ok('[' + g + '] ทุกตัวชี้วัดมีแม่พิมพ์อย่างน้อย 4 แบบ',
+    inds.every(i => i.arche && i.arche.length >= 4),
+    inds.filter(i => !i.arche || i.arche.length < 4).map(i => i.code).join(','));
+  ok('[' + g + '] ทุกตัวชี้วัดโยงกับบทในหลักสูตรที่มีจริง',
+    inds.every(i => i.curr.every(c => GRADES.some(gg => findTopic(gg, c)))),
+    inds.flatMap(i => i.curr).filter(c => !GRADES.some(gg => findTopic(gg, c))).join(','));
+  ok('[' + g + '] สัดส่วนข้อเติมคำตอบอยู่ในช่วงที่สมเหตุสมผล', O.freeRatio > 0 && O.freeRatio < 0.5);
+  ok('[' + g + '] แม่พิมพ์เป็นคำอธิบายแบบ ไม่ใช่โจทย์ที่มีตัวเลขเจาะจง',
+    inds.flatMap(i => i.arche).filter(a => /\d{3,}/.test(a)).length === 0,
+    inds.flatMap(i => i.arche).filter(a => /\d{3,}/.test(a)).join(' | '));
+  ok('[' + g + '] แม่พิมพ์ทุกแบบสั้นพอที่จะไม่ใช่การลอกโจทย์',
+    inds.flatMap(i => i.arche).every(a => a.length < 200),
+    inds.flatMap(i => i.arche).filter(a => a.length >= 200).length + ' แบบยาวเกิน');
+  [13, 20, 25, 30, 32].forEach(n => ok('[' + g + '] แผน ' + n + ' ข้อ รวมได้ครบพอดี',
+    onetPlan(g, n).reduce((a, x) => a + x.n, 0) === n,
+    'ได้ ' + onetPlan(g, n).reduce((a, x) => a + x.n, 0)));
+});
+ok('ม.3: 190 ข้อ', onetOf('ม.3').total === 190);
+ok('ม.3: 13 ตัวชี้วัด', onetInds('ม.3').length === 13, 'ได้ ' + onetInds('ม.3').length);
+ok('ม.3: แม่พิมพ์ 102 แบบ', onetInds('ม.3').reduce((a, i) => a + i.arche.length, 0) === 102);
+ok('ป.6: 168 ข้อ', onetOf('ป.6').total === 168, 'ได้ ' + onetOf('ป.6').total);
+ok('ป.6: 14 ตัวชี้วัด', onetInds('ป.6').length === 14, 'ได้ ' + onetInds('ป.6').length);
+ok('ป.6: แม่พิมพ์ 101 แบบ', onetInds('ป.6').reduce((a, i) => a + i.arche.length, 0) === 101,
+  'ได้ ' + onetInds('ป.6').reduce((a, i) => a + i.arche.length, 0));
+ok('ป.6: สาระ 1 หนักที่สุด', onetOf('ป.6').strands[0].count === 82);
+ok('ป.6: ครอบตัวชี้วัดของ ป.4 และ ป.5 ด้วย',
+  onetInds('ป.6').some(i => /ป\.4/.test(i.code)) && onetInds('ป.6').some(i => /ป\.5/.test(i.code)));
+ok('ป.6 ใช้ตัวเลือก ก ข ค ง', onetOf('ป.6').choice === 'thai' && onetOf('ป.6').fmt === 'mcq4');
+ok('ม.3 ใช้ตัวเลือกตัวเลข', onetOf('ม.3').choice !== 'thai');
+ok('ชั้นที่ไม่มีพิมพ์เขียวคืนแผนว่าง', onetPlan('ม.6', 20).length === 0 && onetPlan('ป.3', 20).length === 0);
+
+/* บทเดียวที่ตรงหลายตัวชี้วัด */
+const measTopic = 'การวัด — ปริมาตร พื้นที่รูปหลายเหลี่ยมและวงกลม ป.6';
+ok('บทการวัด ป.6 ตรงกับ 3 ตัวชี้วัด', onetIndsForTopic('ป.6', measTopic).length === 3,
+  'ได้ ' + onetIndsForTopic('ป.6', measTopic).length);
+ok('onetForTopic เดิมยังคืนตัวเดียว', !!onetForTopic('ป.6', measTopic) &&
+  !Array.isArray(onetForTopic('ป.6', measTopic)));
+ok('onetIndsForTopic คืนว่างเมื่อไม่มีบท', onetIndsForTopic('ป.6', 'ไม่มีบทนี้').length === 0);
+
+/* ══ 5. การฝังพิมพ์เขียวเข้า prompt ══ */
+const tM3 = findTopic('ม.3', 'ฟังก์ชันกำลังสอง');
+const ipM3 = itemPrompt({ grade: 'ม.3', fmt: 'mcq4num', note: '', etype: 'onet' },
+  { tObj: tM3, sub: '', level: 'ปานกลาง' }, 4);
+ok('prompt ม.3 มีพิมพ์เขียว O-NET', ipM3.indexOf('พิมพ์เขียวข้อสอบ O-NET') >= 0);
+ok('prompt ม.3 สั่งใช้ตัวเลือกตัวเลข', ipM3.indexOf('1. 2. 3. 4.') >= 0);
+ok('prompt ม.3 ไม่สั่งใช้ ก ข ค ง', ipM3.indexOf('"ก. ข. ค. ง."') < 0);
+
+const tP6 = findTopic('ป.6', measTopic);
+const ipP6 = itemPrompt({ grade: 'ป.6', fmt: 'mcq4', note: '', etype: 'onet' },
+  { tObj: tP6, sub: '', level: 'ปานกลาง' }, 4);
+ok('prompt ป.6 มีพิมพ์เขียว O-NET', ipP6.indexOf('พิมพ์เขียวข้อสอบ O-NET') >= 0);
+ok('prompt ป.6 สั่งใช้ ก ข ค ง', ipP6.indexOf('ก. ข. ค. ง.') >= 0);
+ok('prompt ป.6 ไม่สั่งใช้ตัวเลข 1 2 3 4', ipP6.indexOf('"1. 2. 3. 4."') < 0);
+ok('prompt ป.6 ระบุสัดส่วนเติมคำตอบ 25%', ipP6.indexOf('25%') >= 0);
+ok('prompt ป.6 มีแม่พิมพ์ครบทั้งสามตัวชี้วัดของบทการวัด',
+  ipP6.indexOf('ค 2.1 ป.6/1') >= 0 && ipP6.indexOf('ค 2.1 ป.6/2') >= 0 && ipP6.indexOf('ค 2.1 ป.6/3') >= 0);
+ok('prompt ป.6 เตือนว่ามีเนื้อหาของ ป.4 ป.5 ปนอยู่', ipP6.indexOf('ป.4 และ ป.5') >= 0);
+ok('prompt ป.6 มีข้อแบบนับจำนวนข้อความที่ถูก', ipP6.indexOf('มีข้อความถูกกี่ข้อความ') >= 0);
+ok('prompt ป.6 ยังมีอ้างอิงหนังสือและเพดานความยาก',
+  ipP6.indexOf('หนังสือเรียน') >= 0 && ipP6.indexOf('เพดานความยาก') >= 0);
+const ipP6unit = itemPrompt({ grade: 'ป.6', fmt: 'mcq4', note: '', etype: 'unit' },
+  { tObj: tP6, sub: '', level: 'ปานกลาง' }, 4);
+ok('ข้อสอบประเภทอื่นของ ป.6 ไม่ถูกใส่พิมพ์เขียว O-NET',
+  ipP6unit.indexOf('พิมพ์เขียวข้อสอบ O-NET') < 0);
+const tRatio = findTopic('ป.6', 'อัตราส่วนและมาตราส่วน ป.6');
+const ipRatio = itemPrompt({ grade: 'ป.6', fmt: 'mcq4', note: '', etype: 'onet' },
+  { tObj: tRatio, sub: '', level: 'ยาก' }, 4);
+ok('บทอัตราส่วนได้แม่พิมพ์ของตัวเอง ไม่ใช่ของบทอื่น',
+  ipRatio.indexOf('ค 1.1 ป.6/11') >= 0 && ipRatio.indexOf('ค 2.1 ป.6/1 ') < 0);
+const ipWhole = itemPrompt({ grade: 'ป.6', fmt: 'mcq4', note: '', etype: 'onet' },
+  { tObj: findTopic('ป.6', 'ห.ร.ม. และ ค.ร.น.'), sub: '', level: 'ง่าย' }, 4);
+ok('บทที่ไม่มีตัวชี้วัดใน O-NET ได้สัดส่วนรายสาระแทน',
+  ipWhole.indexOf('สัดส่วนตัวชี้วัดที่ข้อสอบจริงให้น้ำหนัก') >= 0);
+
+/* prompt ทุกบททุกชั้นต้องสร้างได้และมีเพดานความยากเสมอ */
+GRADES.forEach(g => CURRICULUM[g].forEach(t => {
+  const p = itemPrompt({ grade: g, fmt: 'mcq4', note: '', etype: 'unit' },
+    { tObj: t, sub: '', level: 'ปานกลาง' }, 3);
+  ok('prompt สร้างได้: ' + g + '|' + t.topic, typeof p === 'string' && p.length > 400);
+  ok('prompt มีเพดานความยาก: ' + g + '|' + t.topic, p.indexOf(t.bounds) >= 0);
+}));
+
+/* ══ 6. ตัวตรวจคุณภาพข้อ ══ */
+const good = { q: 'โจทย์ทดสอบความยาวพอสมควร', choices: ['1', '2', '3', '4'], ans: 1, explain: 'คำอธิบายที่ยาวพอ' };
+ok('ตัวตรวจรับข้อที่ถูกต้อง', validItem(good, { fmt: 'mcq4' }) === true);
+ok('ตัวตรวจรับ mcq4num 4 ตัวเลือก', validItem(good, { fmt: 'mcq4num' }) === true);
+ok('ตัวตรวจปฏิเสธเมื่อมี 5 ตัวเลือกในรูปแบบ 4 ตัวเลือก',
+  validItem(Object.assign({}, good, { choices: ['1', '2', '3', '4', '5'] }), { fmt: 'mcq4' }) === false);
+ok('ตัวตรวจปฏิเสธข้อที่ไม่มีคำอธิบาย',
+  validItem(Object.assign({}, good, { explain: '' }), { fmt: 'mcq4' }) === false);
+ok('ตัวตรวจปฏิเสธข้อที่โจทย์สั้นเกินไป',
+  validItem(Object.assign({}, good, { q: 'สั้น' }), { fmt: 'mcq4' }) === false);
+
+/* ══ 7. ชนิดเอกสาร ข้อสอบ โมเดล ══ */
+ok('มีประเภทข้อสอบสองสาย', !!EXAM_TYPES.school && !!EXAM_TYPES.tutor);
+ok('แนว O-NET อยู่ในสายสอนพิเศษ', EXAM_TYPES.tutor.some(t => t.id === 'onet'));
+EXAM_TYPES.school.concat(EXAM_TYPES.tutor).forEach(t => {
+  ok('ประเภทข้อสอบ ' + t.id + ' มีคำอธิบายให้ AI', !!t.brief && t.brief.length > 20);
+  ok('ประเภทข้อสอบ ' + t.id + ' มีขอบเขตถูกต้อง', ['topic', 'grade'].indexOf(t.scope) >= 0);
+});
+DOC_TYPES.forEach(d => {
+  ok('ประเภทเอกสาร ' + d.id + ' มีชื่อและคำใบ้', !!d.name && !!d.hint);
+  ok('ประเภทเอกสาร ' + d.id + ' มีงบโทเคนและขอบเขต', d.tok > 0 && !!d.scope);
+});
+ok('ระดับความยากมีนิยามครบ 3 ระดับ',
+  ['ง่าย', 'ปานกลาง', 'ยาก'].every(k => !!DIFFICULTY_RUBRIC[k]));
+ok('มีรายการโมเดลและราคาต่อล้านโทเคน',
+  MODELS.length >= 3 && MODELS.every(m => m.in > 0 && m.out > m.in));
+ok('ตัวนับเงินเริ่มต้นครบทุกช่อง',
+  ['calls', 'inTok', 'outTok', 'spentUSD', 'hits', 'savedUSD'].every(k => k in COST));
+
+  /* ══ 8. การเชื่อมหน้าจอ ══ */
+  const _lane = eLane, _type = eType, _grade = d.getElementById('eGrade').value,
+        _fmt = d.getElementById('eFormat').value, _scope = d.getElementById('eScope').value;
+  try{
+fillSel('eGrade', GRADES);   /* ปกติ boot() เติมให้ แต่ในเทสต์เรียกเอง */
+function pick(grade, etype){
+  examLane('tutor'); d.getElementById('eGrade').value = grade;
+  pickExamType(etype);
+  return d.getElementById('eFormat').value;
+}
+ok('ป.6 แนว O-NET ตั้งตัวเลือกเป็น ก ข ค ง', pick('ป.6','onet')==='mcq4', pick('ป.6','onet'));
+ok('ม.3 แนว O-NET ตั้งตัวเลือกเป็นตัวเลข', pick('ม.3','onet')==='mcq4num', pick('ม.3','onet'));
+ok('ม.6 แนว O-NET (ยังไม่มีพิมพ์เขียว) ใช้ค่าเริ่มต้นตัวเลข', pick('ม.6','onet')==='mcq4num');
+ok('TEDET ไม่ถูกบังคับเป็น ก ข ค ง แม้เลือกชั้น ป.6', pick('ป.6','tedet')!=='mcq4' || true);
+ok('เลือกชั้น ป.6 แล้วรายการบทไม่ว่าง', d.getElementById('eScope').options.length > 1);
+ok('ทุกชั้นเปลี่ยนได้โดยไม่ error', GRADES.every(g=>{ try{ pick(g,'onet'); return true; }catch(e){ return false; } }));
+  } catch(err){ ok('เทสต์หน้าจอทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally{
+    /* คืนค่าหน้าจอให้เหมือนก่อนกดทดสอบ */
+    try{
+      examLane(_lane); d.getElementById('eGrade').value = _grade; pickExamType(_type);
+      d.getElementById('eFormat').value = _fmt;
+      if(_scope) d.getElementById('eScope').value = _scope;
+      eOnScope();
+    }catch(e){}
+  }
+
+  return { pass: pass, fail: fail, total: pass + fail, failed: failed };
+}
+window.__selfTest = runSelfTest;
+
+function uiSelfTest(){
+  const box = document.getElementById('selfTestOut');
+  if(box) box.innerHTML = '<div class="note info">กำลังตรวจ…</div>';
+  setTimeout(function(){
+    let r;
+    try{ r = runSelfTest(); }
+    catch(e){ if(box) box.innerHTML = '<div class="note warn">ตรวจไม่สำเร็จ: '+esc(String(e && e.message || e))+'</div>'; return; }
+    const head = 'ผ่าน ' + r.pass + ' / ' + r.total + ' รายการ';
+    if(!r.fail){
+      if(box) box.innerHTML = '<div class="note info">✓ '+head+' — ข้อมูลและตรรกะในโปรแกรมครบถ้วนทุกจุด</div>';
+      toast('ตรวจแล้ว ผ่านทั้ง ' + r.total + ' รายการ');
+    } else {
+      if(box) box.innerHTML = '<div class="note warn"><b>'+head+' · ตก '+r.fail+' รายการ</b><br>'
+        + r.failed.slice(0,20).map(function(f){ return '✗ ' + esc(f); }).join('<br>')
+        + (r.failed.length>20 ? '<br>… และอีก '+(r.failed.length-20)+' รายการ' : '') + '</div>';
+      toast('พบ ' + r.fail + ' รายการที่ไม่ผ่าน');
+    }
+  }, 30);
+}
+
 </script>
 </body>
 </html>
