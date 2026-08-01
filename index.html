@@ -287,18 +287,33 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
   .paper .pgbreak{page-break-after:always;border:none;height:0;margin:0;}
   .paper .pgbreak::after{display:none;}
   .paper .qcontest{page-break-inside:avoid;}
+  .paper .qpage{height:243mm;}
+  .paper .qpage:first-of-type{height:212mm;}
   #shell.on{display:block;} .wrap{padding:0;max-width:none;}
   .sheet-shell{border:none;box-shadow:none;border-radius:0;}
   .paper{padding:0;}
   body{background:#fff;}
 }
 .bookref{color:var(--brass);font-size:12px;}
-/* ── รูปแบบข้อสอบแนวแข่งขัน: 3 ข้อ/หน้า มีที่ให้เขียน ── */
-.paper .qch3{grid-template-columns:repeat(3,1fr);gap:4px 12px;}
-@media(max-width:720px){.paper .qch3{grid-template-columns:1fr 1fr;}}
-.paper .qcontest{margin:0 0 10px;padding:10px 0 0;border-bottom:1px dashed var(--line);}
-.paper .qwork{min-height:96px;margin:10px 0 4px;position:relative;}
-.paper .qwork-lined{min-height:120px;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 27px,var(--line) 27px,var(--line) 28px);}
+/* ── การจัดหน้าและการเรียงตัวเลือก ── */
+.paper .qch{align-items:start;}
+.paper .qch>div{display:flex;gap:5px;align-items:baseline;}
+.paper .chn{flex:none;font-weight:600;}
+.paper .qch-1{grid-template-columns:1fr;}
+.paper .qch-2{grid-template-columns:1fr 1fr;}
+.paper .qch-3{grid-template-columns:repeat(3,1fr);}
+.paper .qch-4{grid-template-columns:repeat(4,1fr);}
+.paper .qch-5{grid-template-columns:repeat(5,1fr);}
+@media(max-width:780px){
+  .paper .qch-3,.paper .qch-4,.paper .qch-5{grid-template-columns:1fr 1fr;}
+}
+/* หนึ่งหน้ากระดาษ — เฉลี่ยพื้นที่ว่างให้ทุกข้อเท่า ๆ กัน */
+.paper .qpage{display:flex;flex-direction:column;gap:6px;}
+.paper .qpage>.qcontest{flex:1 1 0;display:flex;flex-direction:column;min-height:150px;}
+.paper .qcontest{margin:0;padding:10px 0 6px;border-bottom:1px dashed var(--line);}
+.paper .qpage-last>.qcontest:last-child{border-bottom:none;}
+.paper .qwork{flex:1 1 auto;min-height:64px;margin:8px 0 4px;position:relative;}
+.paper .qwork-lined{min-height:84px;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 27px,var(--line) 27px,var(--line) 28px);}
 .paper .worklbl{font-size:12px;color:var(--mut);}
 .paper .qans{border-top:1px solid var(--line);padding-top:6px;font-size:14px;}
 .paper .pgbreak{height:0;border-top:2px dashed var(--brass);margin:18px 0;position:relative;}
@@ -597,9 +612,9 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   <div class="fld">
                     <label for="eFormat">รูปแบบข้อ</label>
                     <select id="eFormat">
-                      <option value="mcq4">ปรนัย 4 ตัวเลือก (ก ข ค ง)</option>
-                      <option value="mcq4num">ปรนัย 4 ตัวเลือก (1–4) แนว O-NET</option>
+                      <option value="mcq4num">ปรนัย 4 ตัวเลือก (1–4)</option>
                       <option value="mcq5">ปรนัย 5 ตัวเลือก (1–5)</option>
+                      <option value="mcq4">ปรนัย 4 ตัวเลือก (ก ข ค ง)</option>
                       <option value="mcq5abc">ปรนัย 5 ตัวเลือก (A–E) แนวแข่งขัน</option>
                       <option value="short">เติมคำตอบสั้น</option>
                       <option value="show">แสดงวิธีทำ</option>
@@ -698,6 +713,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <span class="sp" style="flex:1"></span>
               <button class="btn btn-danger btn-sm" onclick="clearLocal()">ล้างคลังในเครื่อง</button>
             </div>
+            <div id="syncStatus"></div>
           </div>
         </div>
 
@@ -3922,7 +3938,8 @@ const BANK = {
     if(rec.hits===undefined) rec.hits = 0;
     this.db[kind][key] = rec;
     this._save();
-    this.pushRemote(kind, rec);
+    const p = this.pushRemote(kind, rec);
+    if(p && p.then) p.then(r=>{ if(r && !r.ok) syncWarn(r.error); });
     return rec;
   },
   touch(kind, key){
@@ -3970,18 +3987,30 @@ const BANK = {
       meta: JSON.stringify(rec.meta||{}),
       password: CFG.pass || ''
     };
+    return this.post(slim);
+  },
+  /* ส่งข้อมูลขึ้นชีตแล้ว "อ่านคำตอบกลับมาจริง"
+     เดิมใช้ mode:'no-cors' ซึ่งทำให้อ่านผลไม่ได้เลย ถ้าเขียนไม่สำเร็จก็ไม่มีใครรู้
+     ตอนนี้ส่งแบบธรรมดา (body เป็นสตริง = simple request ไม่ต้อง preflight)
+     จึงอ่าน {ok:...} กลับมาได้ และรายงานให้ผู้ใช้เห็น */
+  lastError: '',
+  async post(body){
+    if(!this.ready()) return {ok:false, error:'ยังไม่ได้ตั้งค่า Google Sheets'};
     try{
-      fetch(CFG.url, {method:'POST', mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(slim)});
-    }catch(e){}
+      const r = await fetch(CFG.url, {method:'POST', body: JSON.stringify(body)});
+      let d = null;
+      try{ d = await r.json(); }catch(e){ d = null; }
+      if(!d) { this.lastError = 'ตอบกลับไม่ใช่ JSON (HTTP '+r.status+') — ตรวจว่า Deploy ตั้ง "ทุกคน" และ URL ลงท้าย /exec'; return {ok:false, error:this.lastError}; }
+      if(!d.ok){ this.lastError = d.error || 'ไม่ทราบสาเหตุ'; return {ok:false, error:this.lastError}; }
+      return {ok:true};
+    }catch(e){
+      this.lastError = 'ติดต่อ Google ไม่ได้: ' + (e && e.message ? e.message : e);
+      return {ok:false, error:this.lastError};
+    }
   },
   pushHit(kind,key){
     if(!this.ready()) return;
-    try{
-      fetch(CFG.url, {method:'POST', mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify({action:'hit', kind:kind, key:key, password:CFG.pass||''})});
-    }catch(e){}
+    this.post({action:'hit', kind:kind, key:key, password:CFG.pass||''});
   },
   async fetchRemote(kind, key){
     if(!this.ready()) return null;
@@ -4035,7 +4064,7 @@ const BANK = {
     try{
       const u = CFG.url+'?action=stats&password='+encodeURIComponent(CFG.pass||'');
       const r = await fetch(u); const d = await r.json();
-      if(d && d.ok){ this.remoteTotal = d.total; return d; }
+      if(d && d.ok){ this.remoteTotal = (d.total==null) ? ((d.doc||0)+(d.exam||0)+(d.item||0)) : d.total; return d; }
     }catch(e){}
     return null;
   }
@@ -4760,6 +4789,14 @@ ${et.brief}
 ${bookBlock(p.grade, t.topic, group.sub)}${archeBlock(p.grade, t.topic)}${p.etype==='onet' ? onetBlock(p.grade, t.topic) : ''}
 ${houseStyle(p.grade)}
 
+【กติกาการเขียนตัวเลือก — มีผลกับการจัดหน้ากระดาษโดยตรง】
+• ถ้อยคำที่ซ้ำกันในทุกตัวเลือก ให้ย้ายไปไว้ในคำถาม แล้วเหลือเฉพาะส่วนที่ต่างกันไว้ในตัวเลือก
+  เช่น อย่าเขียน "จุดวกกลับ (2,3) แกนสมมาตร x = 2" ทั้งสี่ตัวเลือก แต่ให้ถามว่า "จุดวกกลับและแกนสมมาตรคือข้อใด"
+  แล้วตัวเลือกเหลือเพียง "$(2,3)$, $x=2$"
+• ตัวเลือกทั้งหมดในข้อเดียวกันต้องยาวใกล้เคียงกัน ห้ามมีตัวใดยาวกว่าตัวอื่นมาก
+• ตัวเลือกที่เป็นตัวเลขหรือสูตรล้วน ให้สั้นที่สุดเท่าที่ยังอ่านเข้าใจ (โปรแกรมจะจัดให้อยู่บรรทัดเดียวกันได้)
+• ถ้าตัวเลือกต้องมีหน่วย ให้ใส่หน่วยสั้น ๆ ต่อท้ายตัวเลข ไม่ต้องเขียนประโยคเต็ม
+
 ระดับความยากของทุกข้อในชุดนี้: ${group.level}
 นิยามระดับนี้: ${DIFFICULTY_RUBRIC[group.level]}
 
@@ -4985,6 +5022,26 @@ function examProgress(on, txt, pct, sub){
 }
 
 /* ── วาดกระดาษข้อสอบ ── */
+/* ตัวเลือกสั้น → เรียงแถวเดียว · ยาวปานกลาง → 2 คอลัมน์ · ยาวมาก → บรรทัดละตัวเลือก
+   วัดจากข้อความจริงหลังตัด LaTeX และแท็กออก เพื่อไม่ให้คำสั่งจัดรูปแบบไปนับเป็นความยาว */
+function chPlainLen(c){
+  return String(c)
+    .replace(/<[^>]+>/g, '')
+    .replace(/\\(?:d?frac|dfrac|sqrt|left|right|text|mathrm)/g, ' ')
+    .replace(/\\[a-zA-Z]+/g, 'x')
+    .replace(/[${}^_\\]/g, '')
+    .trim().length;
+}
+function chCols(choices){
+  const LINE = 46;                                   /* ตัวอักษรที่พอดีหนึ่งบรรทัดบนกระดาษ A4 */
+  const LABEL = 4;                                   /* เผื่อเลขข้อ "1." กับช่องไฟ */
+  const n = choices.length;
+  const max = Math.max.apply(null, choices.map(chPlainLen));
+  for(let c = Math.min(n, 5); c >= 2; c--){
+    if((max + LABEL) * c <= LINE) return 'qch-' + c;
+  }
+  return 'qch-1';
+}
 function paintExam(rec, opt){
   opt = opt||{};
   window.__lastExam = {rec:rec, opt:opt};
@@ -5023,24 +5080,36 @@ function paintExam(rec, opt){
   <hr>`;
 
   const PER_PAGE = 3;
-  items.forEach((q,i)=>{
-    const contest = layout==='contest';
-    h += `<div class="qitem${contest?' qcontest':''}"><span class="qnum">${i+1}.</span> ${q.q}`;
+  const contest = layout==='contest';
+  const body = items.map((q,i)=>{
+    let b = `<div class="qitem${contest?' qcontest':''}"><span class="qnum">${i+1}.</span> ${q.q}`;
     if(Array.isArray(q.choices)){
-      const cls = contest ? 'qch qch3' : 'qch';
-      h += `<div class="${cls}">` + q.choices.map((c,k)=>`<div>${LT[k]||k+1}. ${c}</div>`).join('') + `</div>`;
-      if(contest) h += `<div class="qwork"></div>`;
+      b += `<div class="qch ${chCols(q.choices)}">`
+         + q.choices.map((c,k)=>`<div><span class="chn">${LT[k]||k+1}.</span> ${c}</div>`).join('')
+         + `</div>`;
+      if(contest) b += `<div class="qwork"></div>`;
     } else {
-      h += contest
+      b += contest
         ? `<div class="qwork qwork-lined"><span class="worklbl">วิธีทำ</span></div>
            <div class="qans">ตอบ ................................................................</div>`
         : `<br><br>วิธีทำ ................................................................................<br><br>
             ................................................................................<br><br>
             ตอบ ..............................................`;
     }
-    h += `</div>`;
-    if(contest && (i+1)%PER_PAGE===0 && i+1<items.length) h += `<div class="pgbreak"></div>`;
+    return b + `</div>`;
   });
+  if(contest){
+    /* แบ่งเป็นหน้า ๆ ละ PER_PAGE ข้อ แล้วให้แต่ละข้อยืดเต็มหน้าเท่า ๆ กัน
+       พื้นที่ว่างจึงถูกเฉลี่ยอัตโนมัติ ไม่ว่าโจทย์จะสั้นหรือยาว */
+    for(let i=0;i<body.length;i+=PER_PAGE){
+      const page = body.slice(i, i+PER_PAGE);
+      const last = (i+PER_PAGE) >= body.length;
+      h += `<div class="qpage${last?' qpage-last':''}">` + page.join('') + `</div>`;
+      if(!last) h += `<div class="pgbreak"></div>`;
+    }
+  } else {
+    h += body.join('');
+  }
 
   /* ── เฉลย ── */
   let key = `<div id="examKeyBlock">${layout==='contest'?'<div class="pgbreak"></div>':'<hr>'}<h2>เฉลยและแนวการให้คะแนน</h2>`;
@@ -5145,7 +5214,7 @@ function refreshDash(){
     (g<12?'สวัสดีตอนเช้า':g<17?'สวัสดีตอนบ่าย':'สวัสดีตอนเย็น') + (CFG.teacher?' คุณ'+CFG.teacher.replace(/^(นาย|นาง|นางสาว)\s*/,''):'');
 
   document.getElementById('railLocal').textContent = BANK.countAll().toLocaleString();
-  document.getElementById('railRemote').textContent = BANK.remoteTotal===null?'—':BANK.remoteTotal.toLocaleString();
+  document.getElementById('railRemote').textContent = (BANK.remoteTotal==null)?'—':Number(BANK.remoteTotal).toLocaleString();
 
   renderCoverage();
   renderRecent();
@@ -5302,15 +5371,37 @@ async function syncPull(){
   renderRepo(); refreshDash();
   toast(`ดึงมาใหม่ ${r.doc} เอกสาร · ${r.exam} ชุดข้อสอบ · ${r.item} ข้อ`);
 }
+function syncWarn(msg){
+  const el = document.getElementById('syncStatus');
+  if(el) el.innerHTML = `<div class="note err"><b>ส่งขึ้นคลังกลางไม่สำเร็จ</b><br>${esc(msg||'')}</div>`;
+  toast('ส่งขึ้นคลังกลางไม่สำเร็จ');
+}
+function syncOK(msg){
+  const el = document.getElementById('syncStatus');
+  if(el) el.innerHTML = `<div class="note info">${esc(msg||'')}</div>`;
+}
 async function syncPush(){
   if(!BANK.ready()){ toast('ยังไม่ได้ตั้งค่า Google Sheets'); go('set'); return; }
   const all = BANK.all('doc').concat(BANK.all('exam'), BANK.all('item'));
-  toast('กำลังส่งขึ้น Sheets '+all.length+' ชิ้น…');
+  if(!all.length){ syncOK('ยังไม่มีอะไรในเครื่องให้ส่งขึ้น'); toast('คลังในเครื่องยังว่าง'); return; }
+  syncOK('กำลังส่งขึ้น Sheets 0/'+all.length+' …');
+  let ok=0, fail=0, firstErr='';
   for(let i=0;i<all.length;i++){
-    BANK.pushRemote(all[i].kind, all[i]);
-    if(i%12===11) await new Promise(r=>setTimeout(r,220));
+    const r = await BANK.pushRemote(all[i].kind, all[i]);
+    if(r && r.ok) ok++; else { fail++; if(!firstErr) firstErr = (r&&r.error)||'ไม่ทราบสาเหตุ'; }
+    if(i%5===4){
+      syncOK('กำลังส่งขึ้น Sheets '+(i+1)+'/'+all.length+' …');
+      await new Promise(r=>setTimeout(r,120));
+    }
+    if(fail>=3) break;          /* ล้มติดกัน = ตั้งค่าผิด ไม่ต้องยิงต่อให้เสียเวลา */
   }
-  toast('ส่งขึ้นคลังกลางแล้ว '+all.length+' ชิ้น');
+  if(fail){
+    syncWarn('ส่งสำเร็จ '+ok+' ชิ้น · ล้มเหลว '+fail+' ชิ้น<br>สาเหตุแรก: '+firstErr);
+  } else {
+    syncOK('ส่งขึ้นคลังกลางสำเร็จครบ '+ok+' ชิ้น — เปิด Google Sheet ดูได้เลย');
+    toast('ส่งขึ้นคลังกลางแล้ว '+ok+' ชิ้น');
+  }
+  refreshDash();
 }
 function exportBank(){
   BANK._load();
@@ -5431,9 +5522,22 @@ async function testSheets(){
   box.innerHTML = `<div class="note info">กำลังทดสอบ…</div>`;
   const s = await BANK.stats();
   if(s){
-    box.innerHTML = `<div class="note info"><b>เชื่อมต่อสำเร็จ</b><br>
-      คลังกลางมี เอกสาร ${s.doc||0} ชิ้น · ชุดข้อสอบ ${s.exam||0} ชุด · ข้อสอบรายข้อ ${s.item||0} ข้อ<br>
-      เวอร์ชัน Apps Script: ${esc(s.version||'—')}</div>`;
+    /* อ่านได้แล้วยังไม่พอ ต้องพิสูจน์ว่า "เขียนได้" ด้วย เพราะที่ผ่านมาการเขียนล้มเงียบ */
+    const probeKey = '__probe__' + Date.now();
+    const w = await BANK.post({ action:'put', kind:'doc', key:probeKey, grade:'—', topic:'ทดสอบระบบ',
+      sub:'', title:'ทดสอบการเขียน', dtype:'probe', bucket:'', model:'', tin:0, tout:0,
+      payload:'<p>ทดสอบการเขียนจากโปรแกรม</p>', meta:'{}', password: CFG.pass||'' });
+    if(w.ok){
+      BANK.post({ action:'del', kind:'doc', key:probeKey, password: CFG.pass||'' });
+      box.innerHTML = `<div class="note info"><b>เชื่อมต่อสำเร็จ · อ่านได้ · เขียนได้</b><br>
+        คลังกลางมี เอกสาร ${s.doc||0} ชิ้น · ชุดข้อสอบ ${s.exam||0} ชุด · ข้อสอบรายข้อ ${s.item||0} ข้อ<br>
+        เวอร์ชัน Apps Script: ${esc(s.version||'—')}</div>`;
+    } else {
+      box.innerHTML = `<div class="note err"><b>อ่านได้ แต่เขียนไม่ได้</b><br>
+        สาเหตุ: ${esc(w.error||'')}<br>
+        มักเกิดจากตอน Deploy ตั้ง “ผู้ที่มีสิทธิ์เข้าถึง” ไม่ใช่ <b>ทุกคน</b>
+        หรือแก้สคริปต์แล้วยังไม่ได้ <b>ทำให้ใช้งานได้ใหม่</b></div>`;
+    }
     refreshDash();
   } else {
     box.innerHTML = `<div class="note err"><b>เชื่อมต่อไม่สำเร็จ</b><br>
@@ -5503,10 +5607,22 @@ th{background:#f0f3f2;}
 ul,ol{margin:8px 0 8px 22px;} li{margin:3px 0;}
 .qitem{margin:12px 0;page-break-inside:avoid;} .qnum{font-weight:700;}
 .qch{margin:5px 0 0 20px;display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;}
-.qch3{grid-template-columns:repeat(3,1fr);gap:3px 12px;}
-.qcontest{margin:0 0 10px;padding-top:10px;page-break-inside:avoid;}
-.qwork{min-height:26mm;margin:8px 0 4px;}
-.qwork-lined{min-height:34mm;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 7.5mm,#ddd 7.5mm,#ddd calc(7.5mm + 1px));}
+.qch{align-items:start;}
+.qch>div{display:flex;gap:5px;align-items:baseline;}
+.chn{flex:none;font-weight:600;}
+.qch-1{grid-template-columns:1fr;}
+.qch-2{grid-template-columns:1fr 1fr;}
+.qch-3{grid-template-columns:repeat(3,1fr);}
+.qch-4{grid-template-columns:repeat(4,1fr);}
+.qch-5{grid-template-columns:repeat(5,1fr);}
+/* หนึ่งหน้ากระดาษ A4 — เฉลี่ยพื้นที่ว่างให้ทุกข้อเท่ากัน */
+.qpage{display:flex;flex-direction:column;gap:4mm;height:243mm;}
+.qpage:first-of-type{height:212mm;}
+.qpage>.qcontest{flex:1 1 0;display:flex;flex-direction:column;min-height:0;}
+.qcontest{margin:0;padding-top:3mm;page-break-inside:avoid;border-bottom:1px dashed #ccc;padding-bottom:2mm;}
+.qpage-last>.qcontest:last-child{border-bottom:none;}
+.qwork{flex:1 1 auto;min-height:14mm;margin:3mm 0 2mm;}
+.qwork-lined{min-height:20mm;background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 7.5mm,#ddd 7.5mm,#ddd calc(7.5mm + 1px));}
 .worklbl{font-size:12px;color:#666;}
 .qans{border-top:1px solid #bbb;padding-top:5px;font-size:14px;}
 .pgbreak{page-break-after:always;height:0;}
@@ -5530,6 +5646,7 @@ h1{font-size:20pt;} h2{font-size:18pt;} h3{font-size:16pt;}
 table{border-collapse:collapse;width:100%;} th,td{border:1px solid #666;padding:5pt;}
 .ansbox{background:#f4f4f4;border-left:3pt solid #a8791f;padding:6pt;}.bookref{color:#7a5a14;font-size:9pt;}
 .qcontest{padding-top:8pt;}
+.qch>div{margin:2pt 0;}
 .qwork{height:70pt;}
 .qwork-lined{height:95pt;}
 .qans{border-top:1pt solid #bbb;padding-top:4pt;}
