@@ -991,11 +991,20 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                      ondrop="libOnDrop(event)" ondragover="libDragOver(event)" ondragleave="libDragOut()">
                   <div class="dz-ico">⇪</div>
                   <div class="dz-t">ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</div>
-                  <div class="dz-d">PDF · Word · ebook (.epub) · สไลด์ (.pptx) · รูปถ่ายหน้าหนังสือ · ไฟล์ข้อความ และไฟล์อื่น ๆ — เลือกหลายไฟล์พร้อมกันได้ ไฟล์ละไม่เกิน 40 MB</div>
+                  <div class="dz-d">ลากมาได้ทั้ง <b>ไฟล์และทั้งโฟลเดอร์</b> · PDF · Word · ebook (.epub) · สไลด์ (.pptx) · รูปถ่ายหน้าหนังสือ · ไฟล์ข้อความ และไฟล์อื่น ๆ<br>โฟลเดอร์ซ้อนโฟลเดอร์ก็ได้ ระบบจะไล่เก็บไฟล์ข้างในให้เอง ไฟล์ละไม่เกิน 40 MB</div>
                 </div>
                 <input type="file" id="libFile" multiple
                        style="display:none" onchange="libTakeFiles(this.files)">
+                <input type="file" id="libDir" multiple webkitdirectory directory
+                       style="display:none" onchange="libTakeFiles(this.files)">
+                <div class="pkbar">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="libPickFiles()">เลือกไฟล์</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="libPickDir()">เลือกทั้งโฟลเดอร์</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="libClear()">ล้างรายการ</button>
+                  <span class="pkcount" id="libFileNote"></span>
+                </div>
                 <div id="libFiles" class="mt10"></div>
+                <div id="libFolderNote"></div>
 
                 <div class="sepline"></div>
                 <div class="fld">
@@ -8740,19 +8749,87 @@ function libScope(){
 }
 /* ── รับไฟล์ ── */
 function libPickFiles(){ document.getElementById('libFile').click(); }
-function libOnDrop(ev){
+function libPickDir(){ document.getElementById('libDir').click(); }
+
+const LIB_MAX_FILES = 300;      /* กันเผลอลากทั้งไดรฟ์เข้ามา */
+/* เดินเข้าไปในโฟลเดอร์ที่ลากมาวาง ทีละชั้นจนครบทุกไฟล์ */
+async function walkEntry(entry, path, out){
+  if(!entry || out.length >= LIB_MAX_FILES) return;
+  if(entry.isFile){
+    const f = await new Promise((res, rej)=>entry.file(res, rej)).catch(()=>null);
+    if(f){ try{ f.libPath = path + f.name; }catch(e){} out.push({file:f, path: path + f.name}); }
+    return;
+  }
+  if(entry.isDirectory){
+    const reader = entry.createReader();
+    let batch;
+    do{
+      batch = await new Promise(res=>reader.readEntries(res, ()=>res([])));
+      for(const e of batch) await walkEntry(e, path + entry.name + '/', out);
+    } while(batch.length && out.length < LIB_MAX_FILES);
+  }
+}
+function fileRelPath(f){
+  return f.webkitRelativePath || f.libPath || f.name;
+}
+function folderOf(path){
+  /* กลุ่มยึดโฟลเดอร์ชั้นบนสุด — ทั้งเล่มจึงถูกอ่านรวมกันแม้จะแตกโฟลเดอร์ย่อยข้างใน */
+  const parts = String(path||'').split('/');
+  return parts.length > 1 ? parts[0] : '';
+}
+function subFolderOf(path){
+  const parts = String(path||'').split('/');
+  return parts.length > 2 ? parts.slice(1, -1).join('/') : '';
+}
+/* เดาชั้นและหมวดจากชื่อโฟลเดอร์ เช่น "แผน AL คณิตศาสตร์ ป.6 เล่ม 1" */
+function guessFromName(name){
+  const s = String(name||'');
+  const out = {};
+  const g = s.match(/(ป\.[1-6]|ม\.[1-6])/);
+  if(g) out.grade = g[1];
+  if(/แผน|การจัดการเรียนรู้|กำหนดการสอน/.test(s)) out.cat = 'plan';
+  else if(/สอบเข้า|ติวเข้า|เตรียมสอบ|pre\s*test|pretest/i.test(s)) out.cat = 'exam_entrance';
+  else if(/ข้อสอบ|แบบทดสอบ|กลางภาค|ปลายภาค|เก็บคะแนน/.test(s)) out.cat = 'exam_school';
+  else if(/ใบงาน|ใบความรู้|แบบฝึก|สื่อการสอน|เอกสารประกอบการสอน|เอกสารการสอน/.test(s)) out.cat = 'teachdoc';
+  const v = s.match(/เล่ม\s*(\d+)/);
+  if(v) out.vol = +v[1];
+  return out;
+}
+async function libOnDrop(ev){
   ev.preventDefault();
   document.getElementById('libDropZone').classList.remove('over');
-  libTakeFiles((ev.dataTransfer && ev.dataTransfer.files) || []);
+  const dt = ev.dataTransfer;
+  if(!dt) return;
+  const items = dt.items ? Array.from(dt.items) : [];
+  const canWalk = items.length && typeof items[0].webkitGetAsEntry === 'function';
+  if(canWalk){
+    const entries = items.map(i=>i.webkitGetAsEntry ? i.webkitGetAsEntry() : null).filter(Boolean);
+    if(entries.some(e=>e.isDirectory)){
+      toast('กำลังไล่เก็บไฟล์ในโฟลเดอร์…');
+      const out = [];
+      for(const e of entries) await walkEntry(e, '', out);
+      if(out.length){ await libTakeFiles(out); return; }
+    }
+  }
+  libTakeFiles(dt.files || []);
 }
 function libDragOver(ev){ ev.preventDefault(); document.getElementById('libDropZone').classList.add('over'); }
 function libDragOut(){ document.getElementById('libDropZone').classList.remove('over'); }
 async function libTakeFiles(files){
-  const list = Array.from(files||[]);
+  const list = Array.from(files||[]).map(f => f.file ? f : {file:f, path: fileRelPath(f)});
   if(!list.length) return;
-  for(const f of list){
+  if(list.length > LIB_MAX_FILES){
+    toast('รับได้ครั้งละไม่เกิน ' + LIB_MAX_FILES + ' ไฟล์ — ตัดส่วนเกินออกให้');
+    list.length = LIB_MAX_FILES;
+  }
+  /* ถ้าลากมาทั้งโฟลเดอร์ ให้เดาชั้นและหมวดจากชื่อโฟลเดอร์ให้เลย */
+  libAutoScope(list.map(x=>x.path));
+  for(const it of list){
+    const f = it.file, path = it.path || f.name;
     if(f.size > 40*1024*1024){ toast('ข้ามไฟล์ ' + f.name + ' — ใหญ่เกิน 40 MB'); continue; }
-    const row = { name:f.name, size:f.size, state:'กำลังอ่าน…', data:null, err:'' };
+    if(/^~\$|^\./.test(f.name) || /(^|\/)(__MACOSX|\.DS_Store|Thumbs\.db)/i.test(path)) continue;
+    const row = { name:f.name, path:path, folder:folderOf(path), sub:subFolderOf(path), size:f.size,
+                  state:'กำลังอ่าน…', data:null, err:'' };
     libFiles.push(row); libPaintFiles();
     try{
       row.data = await extractFile(f, (i,n,msg)=>{
@@ -8767,31 +8844,96 @@ async function libTakeFiles(files){
     libPaintFiles();
   }
   document.getElementById('libFile').value = '';
+  document.getElementById('libDir').value = '';
+}
+/* เดาหมวดและชั้นจากชื่อโฟลเดอร์แล้วตั้งค่าให้ในใบสั่งงาน ครูแก้ทับได้เสมอ */
+function libAutoScope(paths){
+  const folders = Array.from(new Set(paths.map(folderOf).filter(Boolean)));
+  if(!folders.length) return;
+  const g = guessFromName(folders.join(' | '));
+  let msg = [];
+  if(g.cat && LIB_CATS.some(c=>c.id===g.cat)){ pickLibCat(g.cat); msg.push(libCat(g.cat).name); }
+  if(g.grade && GRADES.indexOf(g.grade) >= 0){
+    const sel = document.getElementById('libGrade');
+    if(sel){ sel.value = g.grade; libOnGrade(); msg.push(g.grade); }
+  }
+  const note = document.getElementById('libFolderNote');
+  if(note) note.innerHTML = folders.length
+    ? `<div class="note info">อ่านจากโฟลเดอร์ ${esc(folders.length)} โฟลเดอร์`
+      + (msg.length ? ` · เดาให้แล้วว่าเป็น <b>${esc(msg.join(' · '))}</b> แก้ได้ถ้าไม่ตรง` : '')
+      + `</div>` : '';
+}
+function libGroups(){
+  /* จัดไฟล์เป็นกลุ่มตามโฟลเดอร์ ไฟล์เดี่ยว ๆ รวมเป็นกลุ่มเดียว */
+  const map = new Map();
+  libFiles.forEach((f,i)=>{
+    const key = f.folder || '';
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(Object.assign({idx:i}, f));
+  });
+  return Array.from(map.entries()).map(([folder, rows])=>({folder:folder, rows:rows}));
 }
 function libPaintFiles(){
   const host = document.getElementById('libFiles');
   if(!host) return;
-  host.innerHTML = libFiles.length ? libFiles.map((f,i)=>
-    `<div class="orow${f.err?' off':''}">
-       <span class="on-n">${i+1}</span>
-       <span class="on-t">${esc(f.name)}<small>${esc(f.err || f.state)}</small></span>
-       <span class="on-b"><button class="btn btn-ghost btn-sm" onclick="libDropFile(${i})">✕</button></span>
-     </div>`).join('') : '';
+  const gs = libGroups();
+  host.innerHTML = libFiles.length ? gs.map(g=>
+    (g.folder ? `<div class="obox">📁 ${esc(g.folder)} · ${g.rows.length} ไฟล์</div>` : '')
+    + g.rows.map(f=>
+      `<div class="orow${f.err?' off':''}">
+         <span class="on-n">${f.idx+1}</span>
+         <span class="on-t">${f.sub ? esc(f.sub) + ' / ' : ''}${esc(f.name)}<small>${esc(f.err || f.state)}</small></span>
+         <span class="on-b"><button class="btn btn-ghost btn-sm" onclick="libDropFile(${f.idx})">✕</button></span>
+       </div>`).join('')).join('') : '';
   const ready = libFiles.filter(f=>f.data && !f.err).length;
   const btn = document.getElementById('libGoBtn');
   if(btn) btn.disabled = !ready;
   const n = document.getElementById('libFileNote');
-  if(n) n.textContent = libFiles.length ? ('พร้อมถอด ' + ready + ' ไฟล์') : '';
+  if(n){
+    const jobs = libJobs().length;
+    n.textContent = libFiles.length
+      ? ('พร้อมถอด ' + ready + ' ไฟล์' + (jobs ? ' · เรียก AI ' + jobs + ' ครั้ง' : ''))
+      : '';
+  }
 }
 function libDropFile(i){ libFiles.splice(i,1); libPaintFiles(); }
 function libClear(){ libFiles = []; libDraft = null; libPaintFiles(); document.getElementById('libDraft').innerHTML = ''; }
 
 /* ── ถอดเป็นฐานข้อมูล ── */
+const LIB_JOB_CHARS = 55000;    /* ตัวอักษรต่อการเรียก AI หนึ่งครั้ง */
+/* รวมไฟล์ในโฟลเดอร์เดียวกันให้เป็นงานเดียว แล้วหั่นตามขนาดถ้ายาวเกิน
+   อัปโหลด 30 ไฟล์จากโฟลเดอร์เดียวจึงเรียก AI ไม่กี่ครั้ง ไม่ใช่ 30 ครั้ง */
+function libJobs(){
+  const jobs = [];
+  libGroups().forEach(g=>{
+    const rows = g.rows.filter(f=>f.data && !f.err);
+    if(!rows.length) return;
+    let cur = null;
+    rows.forEach(f=>{
+      const t = f.data.text || '';
+      const imgs = f.data.images || [];
+      if(!cur || (cur.chars + t.length > LIB_JOB_CHARS && cur.chars > 0)){
+        cur = { folder:g.folder, names:[], text:'', images:[], chars:0 };
+        jobs.push(cur);
+      }
+      cur.names.push(f.name);
+      if(t) cur.text += (cur.text ? '\n\n=== ' + f.name + ' ===\n' : '') + t.slice(0, LIB_JOB_CHARS);
+      cur.chars = cur.text.length;
+      imgs.forEach(im=>{ if(cur.images.length < MAX_VISION_PAGES) cur.images.push(im); });
+    });
+  });
+  return jobs;
+}
 async function libExtract(){
   const ready = libFiles.filter(f=>f.data && !f.err);
   if(!ready.length){ toast('ยังไม่มีไฟล์ที่อ่านได้'); return; }
+  const jobs = libJobs();
   const scope = libScope();
   const k = LIB_KINDS.find(x=>x.id===libKind) || LIB_KINDS[0];
+  const m = modelById(CFG.model);
+  const est = jobs.reduce((a,j)=>a + (j.chars/2.5/1e6*m.in + k.tok/1e6*m.out), 0);
+  if(jobs.length > 3 && !confirm('จะถอด ' + ready.length + ' ไฟล์ โดยเรียก AI ' + jobs.length
+      + ' ครั้ง ประมาณการ ' + thbFmt(est) + '\n\nดำเนินการต่อหรือไม่')) return;
   const prog = document.getElementById('libProg');
   prog.style.display = 'block';
   document.getElementById('libProgFill').style.width = '15%';
@@ -8799,13 +8941,16 @@ async function libExtract(){
   const merged = { total:0, groups:[], notes:[] };
   let errs = [];
   try{
-    for(let i=0;i<ready.length;i++){
-      const f = ready[i];
-      document.getElementById('libProgFill').style.width = (15 + Math.round((i+1)/ready.length*75)) + '%';
-      document.getElementById('libProgTxt').textContent = 'กำลังถอด ' + f.name + ' (' + (i+1) + '/' + ready.length + ')';
+    for(let i=0;i<jobs.length;i++){
+      const f = jobs[i];
+      document.getElementById('libProgFill').style.width = (15 + Math.round((i+1)/jobs.length*75)) + '%';
+      document.getElementById('libProgTxt').textContent =
+        'กำลังถอด ' + (f.folder ? f.folder + ' — ' : '') + f.names.slice(0,2).join(', ')
+        + (f.names.length > 2 ? ' และอีก ' + (f.names.length-2) + ' ไฟล์' : '')
+        + ' (' + (i+1) + '/' + jobs.length + ')';
       try{
-        const res = await callAI(libPrompt(libKind, scope, f.data.text, !!f.data.images.length),
-          { model: CFG.model, maxTok: k.tok, images: f.data.images.slice(0, MAX_VISION_PAGES) });
+        const res = await callAI(libPrompt(libKind, scope, f.text, !!f.images.length),
+          { model: CFG.model, maxTok: k.tok, images: f.images.slice(0, MAX_VISION_PAGES) });
         const obj = safeJSON(res.text);
         const one = libClean(libKind, (Array.isArray(obj) ? obj[0] : obj) || {}, scope);
         merged.total += one.total;
@@ -8818,7 +8963,7 @@ async function libExtract(){
           } else merged.groups.push(g);
         });
         one.notes.forEach(n=>{ if(merged.notes.indexOf(n)<0) merged.notes.push(n); });
-      }catch(e){ errs.push(f.name + ': ' + e.message); }
+      }catch(e){ errs.push((f.folder || f.names[0]) + ': ' + e.message); }
     }
   }finally{
     prog.style.display = 'none';
@@ -8833,8 +8978,13 @@ async function libExtract(){
   libDraft = {
     kind: libKind, scope: scope,
     cat: libCatId,
-    title: libCat(libCatId).name + ' · ' + ready.map(f=>f.name.replace(/\.[^.]+$/,'')).join(', ').slice(0,60),
-    data: merged, src: ready.map(f=>f.name), on:true
+    title: libCat(libCatId).name + ' · ' + (function(){
+      const fs = Array.from(new Set(ready.map(f=>f.folder).filter(Boolean)));
+      if(fs.length === 1) return fs[0].split('/').pop();
+      if(fs.length > 1) return fs.length + ' โฟลเดอร์ · ' + ready.length + ' ไฟล์';
+      return ready.map(f=>f.name.replace(/\.[^.]+$/,'')).join(', ').slice(0,60);
+    })(),
+    data: merged, src: ready.map(f=>f.path || f.name), on:true
   };
   libPaintDraft(errs);
 }
@@ -10385,6 +10535,65 @@ ok('สเปกรูปที่ผิดรูปแบบไม่ถูก�
   } catch(err){ ok('เทสต์เลือกหลายบททำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally{ try{ examLane(_lane); pickExamType(_type); }catch(e){} }
 })();
+
+    /* ── อัปโหลดทั้งโฟลเดอร์ ── */
+    ok('มีช่องเลือกทั้งโฟลเดอร์และเปิดโหมดโฟลเดอร์ไว้',
+      !!d.getElementById('libDir') && d.getElementById('libDir').hasAttribute('webkitdirectory'));
+    ok('แยกโฟลเดอร์ชั้นบนสุดกับโฟลเดอร์ย่อยได้',
+      folderOf('เล่ม 1/หน่วย 1/a.pdf') === 'เล่ม 1' &&
+      subFolderOf('เล่ม 1/หน่วย 1/a.pdf') === 'หน่วย 1' &&
+      folderOf('a.pdf') === '' && subFolderOf('เล่ม 1/a.pdf') === '');
+    ok('เดาชั้นและหมวดจากชื่อโฟลเดอร์แผนการสอนได้',
+      (function(){ const g = guessFromName('แผน AL รายวิชาเพิ่มเติม คณิตศาสตร์ ม.6 เล่ม 1');
+        return g.grade === 'ม.6' && g.cat === 'plan' && g.vol === 1; })());
+    ok('เดาหมวดข้อสอบในโรงเรียนได้',
+      guessFromName('ข้อสอบปลายภาค คณิตศาสตร์ ป.4').cat === 'exam_school');
+    ok('เดาหมวดสอบเข้าได้',
+      guessFromName('ติวเข้า ม.1 โรงเรียนดัง').cat === 'exam_entrance');
+    ok('เดาหมวดเอกสารการสอนได้',
+      guessFromName('ใบงาน เศษส่วน ป.5').cat === 'teachdoc');
+    ok('ชื่อที่เดาไม่ออกต้องไม่มั่วหมวดให้',
+      Object.keys(guessFromName('เอกสารทั่วไป 2569')).length === 0);
+    await (async function(){
+      const _files = libFiles.slice(), _cat = libCatId;
+      try{
+        initLibUI();
+        libFiles = [];
+        const mk = (path, text) => {
+          const f = new File([text], path.split('/').pop(), {type:'text/plain'});
+          try{ Object.defineProperty(f, 'webkitRelativePath', {value:path}); }catch(e){}
+          return f;
+        };
+        await libTakeFiles([
+          mk('แผน AL คณิตศาสตร์ ป.6 เล่ม 1/หน่วยที่ 1.txt', new Array(400).join('แผนการจัดการเรียนรู้ ')),
+          mk('แผน AL คณิตศาสตร์ ป.6 เล่ม 1/หน่วยที่ 2.txt', new Array(400).join('ขั้นสอน ขั้นสรุป ')),
+          mk('แผน AL คณิตศาสตร์ ป.6 เล่ม 1/ย่อย/หน่วยที่ 3.txt', new Array(400).join('การวัดผล ')),
+          mk('แผน AL คณิตศาสตร์ ป.6 เล่ม 1/~$ชั่วคราว.txt', 'ไฟล์ชั่วคราวของ Word'),
+          mk('แผน AL คณิตศาสตร์ ป.6 เล่ม 1/.DS_Store', 'ขยะของระบบ')
+        ]);
+        ok('อ่านไฟล์ในโฟลเดอร์ได้ครบและข้ามไฟล์ขยะของระบบ', libFiles.length === 3, libFiles.length + '');
+        ok('ไฟล์ในโฟลเดอร์ย่อยถูกเก็บมาด้วย', libFiles.some(f=>f.sub === 'ย่อย'));
+        ok('จัดกลุ่มด้วยโฟลเดอร์ชั้นบนสุด ทั้งเล่มจึงอยู่กลุ่มเดียวกัน',
+          libGroups().length === 1 && libGroups()[0].folder === 'แผน AL คณิตศาสตร์ ป.6 เล่ม 1');
+        ok('ทั้งโฟลเดอร์ถูกรวมเป็นการเรียก AI ครั้งเดียว ไม่ใช่ไฟล์ละครั้ง',
+          libJobs().length === 1 && libJobs()[0].names.length === 3);
+        ok('เดาหมวดและชั้นจากชื่อโฟลเดอร์ให้อัตโนมัติ',
+          libCatId === 'plan' && d.getElementById('libGrade').value === 'ป.6');
+        ok('บอกจำนวนครั้งที่จะเรียก AI ให้เห็นก่อนกดถอด',
+          d.getElementById('libFileNote').textContent.indexOf('เรียก AI 1 ครั้ง') >= 0);
+        ok('รายการไฟล์แสดงชื่อโฟลเดอร์ให้เห็น',
+          d.getElementById('libFiles').innerHTML.indexOf('แผน AL คณิตศาสตร์ ป.6 เล่ม 1') >= 0);
+        /* ไฟล์เยอะจนยาวเกินโควตาต่อครั้ง ต้องถูกหั่นเป็นหลายงาน */
+        libFiles = [];
+        const big = new Array(30000).join('ก');
+        await libTakeFiles([mk('เล่มใหญ่/a.txt', big), mk('เล่มใหญ่/b.txt', big), mk('เล่มใหญ่/c.txt', big)]);
+        ok('เนื้อหายาวเกินโควตาต่อครั้ง ถูกหั่นเป็นหลายงานให้เอง', libJobs().length >= 2, libJobs().length + '');
+        ok('ทุกงานยังอยู่ในโควตาตัวอักษรต่อครั้ง',
+          libJobs().every(j=>j.chars <= LIB_JOB_CHARS + 60000));
+      } catch(err){ ok('เทสต์อัปโหลดทั้งโฟลเดอร์ทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+      finally{ libFiles = _files; try{ pickLibCat(_cat); }catch(e){} libPaintFiles(); }
+    })();
+    ok('รับไฟล์ครั้งละไม่เกินสามร้อยไฟล์', LIB_MAX_FILES === 300);
 
     /* ── หมวดการอัปโหลดบนหน้าจอ ── */
     (function(){
