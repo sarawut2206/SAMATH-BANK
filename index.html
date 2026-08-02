@@ -319,6 +319,11 @@ table.sgrid input{width:15px;height:15px;cursor:pointer;}
 .mtag.m5{color:#0b7a4b;border-color:#a5ddc3;background:#e9f8f1;}
 .planbox{border-top:2px dashed var(--line2);padding-top:14px;margin-top:14px;}
 .stupane{display:block;}
+.dropzone{border:2px dashed var(--line2);border-radius:12px;background:var(--card2);padding:26px 18px;text-align:center;cursor:pointer;transition:all .15s;}
+.dropzone:hover,.dropzone.over{border-color:var(--teal);background:var(--tealsoft);}
+.dropzone .dz-ico{font-size:30px;color:var(--teal);line-height:1;}
+.dropzone .dz-t{font-weight:700;font-size:16px;margin-top:8px;}
+.dropzone .dz-d{font-size:14px;color:var(--muted);margin-top:4px;line-height:1.5;}
 /* ป้ายระดับความยากท้ายข้อ */
 .paper .qlv{display:inline-block;font-size:13px;font-weight:600;padding:1px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;border:1px solid;}
 .paper .qlv-e{color:#2c6e4f;border-color:#9fcbb4;background:#eaf6f0;}
@@ -453,6 +458,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
       <button class="rail-btn" data-page="exam" onclick="go('exam')"><span class="rail-ico">▤</span><span class="lbl">สตูดิโอข้อสอบ</span></button>
       <button class="rail-btn" data-page="stu" onclick="go('stu')"><span class="rail-ico">◑</span><span class="lbl">นักเรียน</span></button>
       <div class="rail-sec">คลัง</div>
+      <button class="rail-btn" data-page="lib" onclick="go('lib')"><span class="rail-ico">⇪</span><span class="lbl">คลังความรู้</span></button>
       <button class="rail-btn" data-page="repo" onclick="go('repo')"><span class="rail-ico">▦</span><span class="lbl">คลังกลาง</span></button>
       <button class="rail-btn" data-page="curr" onclick="go('curr')"><span class="rail-ico">◈</span><span class="lbl">หลักสูตร</span></button>
       <div class="rail-sec">ระบบ</div>
@@ -504,6 +510,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <button class="qa-btn" onclick="qaExam('onet')"><span class="qa-ico">◈</span><span class="qa-t">ข้อสอบแนว O-NET</span><span class="qa-d">สำหรับติว ป.6 / ม.3 / ม.6</span></button>
               <button class="qa-btn" onclick="qaBook('textbook')"><span class="qa-ico">▥</span><span class="qa-t">สร้างหนังสือทั้งเล่ม</span><span class="qa-d">วางโครงจากหลักสูตร แล้วสั่งเขียนทีละบท</span></button>
               <button class="qa-btn" onclick="qaExam('achv')"><span class="qa-ico">✓</span><span class="qa-t">วัดผลสัมฤทธิ์ตามตัวชี้วัด</span><span class="qa-d">ทั้งชั้นปี พร้อมรหัสตัวชี้วัดกำกับทุกข้อ</span></button>
+              <button class="qa-btn" onclick="go('lib')"><span class="qa-ico">⇪</span><span class="qa-t">อัปโหลดเข้าคลังความรู้</span><span class="qa-d">โยนไฟล์ PDF หรือ Word แล้วให้โปรแกรมถอดเป็นฐานข้อมูล</span></button>
               <button class="qa-btn" onclick="go('stu')"><span class="qa-ico">◑</span><span class="qa-t">วิเคราะห์นักเรียน</span><span class="qa-d">บันทึกผลรายข้อ แล้วดูแผนที่ทักษะรายคน</span></button>
             </div>
           </div>
@@ -962,6 +969,76 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
         </div>
       </section>
 
+
+      <!-- ═══════ KNOWLEDGE LIBRARY ═══════ -->
+      <section class="page" id="pg-lib">
+        <div class="ph">
+          <h1>คลังความรู้</h1>
+          <p>โยนไฟล์ PDF, Word หรือรูปถ่ายหนังสือเข้ามาได้เลย โปรแกรมจะถอดเป็นฐานข้อมูลให้เอง แล้วนำไปใช้ตอนสร้างเอกสาร ข้อสอบ และหนังสือโดยอัตโนมัติ ไม่ต้องรอให้ใครมาเขียนโค้ดเพิ่ม</p>
+        </div>
+
+        <div class="studio">
+          <div class="order">
+            <div class="card">
+              <div class="card-hd"><h3>ขั้นที่ 1 · โยนไฟล์เข้ามา</h3></div>
+              <div class="card-bd">
+                <div class="dropzone" id="libDropZone" onclick="libPickFiles()"
+                     ondrop="libOnDrop(event)" ondragover="libDragOver(event)" ondragleave="libDragOut()">
+                  <div class="dz-ico">⇪</div>
+                  <div class="dz-t">ลากไฟล์มาวางตรงนี้ หรือกดเพื่อเลือกไฟล์</div>
+                  <div class="dz-d">PDF · Word (.docx) · รูปถ่ายหน้าหนังสือ · ไฟล์ข้อความ — เลือกหลายไฟล์พร้อมกันได้</div>
+                </div>
+                <input type="file" id="libFile" multiple accept=".pdf,.docx,.doc,.txt,.md,.csv,.png,.jpg,.jpeg,.webp"
+                       style="display:none" onchange="libTakeFiles(this.files)">
+                <div id="libFiles" class="mt10"></div>
+
+                <div class="sepline"></div>
+                <div class="fld">
+                  <label>ให้ถอดออกมาเป็นอะไร</label>
+                  <div class="dtg" id="libKindGrid"></div>
+                </div>
+                <div class="row2">
+                  <div class="fld"><label for="libGrade">ระดับชั้น</label>
+                    <select id="libGrade" onchange="libOnGrade()"></select></div>
+                  <div class="fld" id="libTopicWrap"><label for="libTopic">บทเรียน</label>
+                    <select id="libTopic"></select></div>
+                </div>
+                <div class="row2" id="libEntWrap">
+                  <div class="fld"><label for="libEnt">ผูกกับสนามสอบ</label>
+                    <select id="libEnt" onchange="libOnEnt()"></select></div>
+                  <div class="fld"><label for="libTier">ห้องเรียนที่สอบ</label>
+                    <select id="libTier"></select></div>
+                </div>
+                <button class="btn btn-primary w100" id="libGoBtn" onclick="libExtract()" disabled>
+                  ขั้นที่ 2 · ถอดเป็นฐานข้อมูล</button>
+                <div class="note info mt10">โปรแกรมเก็บเฉพาะโครงสร้าง สัดส่วน และแม่พิมพ์โจทย์ ไม่เก็บตัวโจทย์หรือข้อความจากต้นฉบับ</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="workarea">
+            <div class="card mb20">
+              <div class="card-hd"><h3>ขั้นที่ 3 · ตรวจแล้วบันทึก</h3></div>
+              <div class="card-bd">
+                <div class="prog" id="libProg" style="display:none">
+                  <div class="prog-bar"><div class="prog-fill" id="libProgFill"></div></div>
+                  <div class="prog-txt" id="libProgTxt">กำลังถอด…</div>
+                </div>
+                <div id="libDraft"><div class="empty"><div class="empty-ico">⇪</div>
+                  <h4>ยังไม่มีผลการถอด</h4>
+                  <p>โยนไฟล์เข้ามาทางซ้าย เลือกว่าจะถอดเป็นอะไร แล้วกดถอดเป็นฐานข้อมูล</p></div></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-hd"><h3>ความรู้ที่บันทึกไว้แล้ว</h3>
+                <span class="chip teal" id="libCountChip"></span></div>
+              <div class="card-bd"><div id="libSaved"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ═══════ REPOSITORY ═══════ -->
       <section class="page" id="pg-repo">
         <div class="ph">
@@ -980,6 +1057,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   <option value="exam">ชุดข้อสอบ</option>
                   <option value="item">ข้อสอบรายข้อ</option>
                   <option value="book">หนังสือทั้งเล่ม</option>
+                  <option value="lib">คลังความรู้</option>
                 </select>
               </div>
               <div class="fld mb0">
@@ -5446,7 +5524,7 @@ const BANK = {
     if(this._loaded) return;
     try{ this.db = JSON.parse(localStorage.getItem(BANK_LS)||'null') || {doc:{},exam:{},item:{}}; }
     catch(e){ this.db = {doc:{},exam:{},item:{}}; }
-    ['doc','exam','item','book'].forEach(k=>{ if(!this.db[k]) this.db[k]={}; });
+    ['doc','exam','item','book','lib'].forEach(k=>{ if(!this.db[k]) this.db[k]={}; });
     try{ this.meta = JSON.parse(localStorage.getItem(BANK_META)||'null') || {savedUSD:0, created:Date.now()}; }
     catch(e){ this.meta = {savedUSD:0, created:Date.now()}; }
     this._loaded = true;
@@ -5504,7 +5582,7 @@ const BANK = {
   del(kind, key){ this._load(); if(this.db[kind]) delete this.db[kind][key]; this._save(); },
   all(kind){ this._load(); return Object.values(this.db[kind]||{}); },
   count(kind){ this._load(); return Object.keys(this.db[kind]||{}).length; },
-  countAll(){ return this.count('doc')+this.count('exam')+this.count('item')+this.count('book'); },
+  countAll(){ return this.count('doc')+this.count('exam')+this.count('item')+this.count('book')+this.count('lib'); },
 
   /* ── คลังข้อสอบรายข้อ: หยิบข้อที่ยังไม่ถูกใช้ในชุดนี้ ── */
   itemKeyOf(grade, topic, sub, level){ return [grade,topic,sub||'-','L'+level].join('|'); },
@@ -5523,6 +5601,41 @@ const BANK = {
 
   /* ── ซิงก์กับ Google Sheets ── */
   ready(){ return !!(CFG.url && CFG.url.indexOf('script.google.com')>-1); },
+
+  /* ══ ตัวส่งข้อมูลขึ้น Apps Script ══
+     ใช้ text/plain เพื่อให้เป็นคำขอแบบง่าย เบราว์เซอร์จะได้ไม่ยิง preflight
+     ซึ่ง Apps Script ไม่รองรับ · ไม่โยน error ออกไป แต่คืน {ok:false,error} เสมอ
+     เพื่อให้ตัวจัดคิวตัดสินใจได้เองว่าจะลองใหม่หรือข้าม */
+  async post(body, ms){
+    if(!this.ready()) return {ok:false, error:'ยังไม่ได้ตั้งค่า URL ของคลังกลาง'};
+    const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const timer = ctl ? setTimeout(()=>ctl.abort(), ms || 60000) : null;
+    try{
+      const res = await fetch(CFG.url, {
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(Object.assign({password: CFG.pass||''}, body)),
+        redirect:'follow',
+        signal: ctl ? ctl.signal : undefined
+      });
+      const txt = await res.text();
+      if(!res.ok) return {ok:false, error:'HTTP '+res.status+(txt?' · '+txt.slice(0,120):'')};
+      let d;
+      try{ d = JSON.parse(txt); }
+      catch(e){
+        /* ได้หน้า HTML กลับมาแทน JSON = deployment ตายหรือ URL ผิด */
+        return {ok:false, error: /does not exist|ไม่พบ/i.test(txt)
+          ? 'ไม่พบ deployment ของ Apps Script — ต้อง Deploy ใหม่แล้วนำ URL มาใส่ในหน้าตั้งค่า'
+          : 'ชีตตอบกลับมาไม่ใช่ JSON — ตรวจว่าเผยแพร่แบบ Anyone แล้วหรือยัง' };
+      }
+      return d && typeof d==='object' ? d : {ok:false, error:'รูปแบบคำตอบจากชีตไม่ถูกต้อง'};
+    }catch(e){
+      const m = String(e && e.message || e);
+      return {ok:false, error: /abort/i.test(m) ? 'ชีตตอบช้าเกินไป (หมดเวลารอ)' : m};
+    }finally{
+      if(timer) clearTimeout(timer);
+    }
+  },
   pushRemote(kind, rec){
     if(!this.ready()) return;
     this.queue({
@@ -5650,7 +5763,7 @@ const BANK = {
   /* เอาของเก่าที่ยังไม่เคยขึ้นชีตใส่คิวให้ครบ (ใช้ตอนเพิ่งตั้งค่าชีตครั้งแรก) */
   enqueueUnsynced(all){
     let n = 0;
-    ['doc','exam','item','book'].forEach(kind=>{
+    ['doc','exam','item','book','lib'].forEach(kind=>{
       this.all(kind).forEach(rec=>{
         if(all || !rec.synced){ this.pushRemote(kind, rec); n++; }
       });
@@ -5685,10 +5798,10 @@ const BANK = {
     }catch(e){ return 0; }
   },
   async pullAll(limit){
-    if(!this.ready()) return {doc:0,exam:0,item:0,book:0};
-    const out = {doc:0,exam:0,item:0,book:0};
+    if(!this.ready()) return {doc:0,exam:0,item:0,book:0,lib:0};
+    const out = {doc:0,exam:0,item:0,book:0,lib:0};
     this._load();
-    for(const kind of ['doc','exam','item','book']){
+    for(const kind of ['doc','exam','item','book','lib']){
       try{
         const u = CFG.url+'?action=list&kind='+kind+'&limit='+(limit||400)
                 + '&password='+encodeURIComponent(CFG.pass||'');
@@ -5696,7 +5809,14 @@ const BANK = {
         if(d && d.ok && Array.isArray(d.items)){
           d.items.forEach(raw=>{
             const rec = normRec(raw);
-            if(rec && rec.key && !this.db[kind][rec.key]){ this.db[kind][rec.key]=rec; out[kind]++; }
+            if(rec && rec.key && !this.db[kind][rec.key]){
+              this.db[kind][rec.key]=rec; out[kind]++;
+              /* ความรู้ที่ครูเคยอัปโหลดจากเครื่องอื่น ให้กลับเข้าคลังความรู้ในเครื่องนี้ด้วย */
+              if(kind==='lib' && rec.data && rec.data.id){
+                libLoad();
+                if(!LIB.items.some(x=>x.id===rec.data.id)){ LIB.items.push(rec.data); libSave(); }
+              }
+            }
           });
         }
       }catch(e){}
@@ -5734,6 +5854,7 @@ function normRec(raw){
     let obj = p;
     if(typeof obj==='string'){ try{ obj = JSON.parse(obj); }catch(e){ return null; } }
     if(rec.kind==='item'){ rec.q = obj; if(!rec.q || !rec.q.q) return null; }
+    else if(rec.kind==='lib'){ rec.data = obj; if(!rec.data || !rec.data.kind) return null; }
     else { rec.data = obj; if(!rec.data || !Array.isArray(rec.data.items)) return null; }
   }
   return rec;
@@ -5748,7 +5869,12 @@ async function callAI(prompt, opt){
   const maxTok  = opt.maxTok || 2500;
   if(!CFG.key || CFG.key.length < 20) throw new Error('ยังไม่ได้ใส่ API Key — ไปที่หน้าตั้งค่า');
 
-  const body = { model: modelId, max_tokens: maxTok, messages:[{role:'user', content: prompt}] };
+  /* opt.images = [{media, data}] สำหรับหน้าที่สแกนมาเป็นรูป — ให้ AI อ่านจากภาพโดยตรง */
+  const content = (opt.images && opt.images.length)
+    ? opt.images.map(im=>({ type:'image', source:{ type:'base64', media_type: im.media||'image/jpeg', data: im.data } }))
+        .concat([{ type:'text', text: prompt }])
+    : prompt;
+  const body = { model: modelId, max_tokens: maxTok, messages:[{role:'user', content: content}] };
   if(opt.system) body.system = opt.system;
   if(opt.json){
     body.system = (opt.system? opt.system+'\n\n' : '') +
@@ -6831,7 +6957,7 @@ ${et.brief}
 ⛔ เพดานความยาก ห้ามเกินเด็ดขาด: ${t.bounds}
 สาระย่อยที่ต้องวัด: ${group.sub || t.subs.join(' / ')}
 
-${bookBlock(G, t.topic, group.sub)}${archeBlock(G, t.topic)}${p.etype==='onet' ? onetBlock(G, t.topic) : ''}${p.etype==='achv' ? achvBlock(G, t.topic) : ''}${isEnt(p.etype) ? entBlock(p.etype, p.tier, G, t.topic) : ''}${figBlock(t)}
+${bookBlock(G, t.topic, group.sub)}${archeBlock(G, t.topic)}${p.etype==='onet' ? onetBlock(G, t.topic) : ''}${p.etype==='achv' ? achvBlock(G, t.topic) : ''}${isEnt(p.etype) ? entBlock(p.etype, p.tier, G, t.topic) : ''}${libBlock({grade:G, topic:t.topic, etype:p.etype, tier:p.tier})}${figBlock(t)}
 ${houseStyle(G)}
 
 【กติกาการเขียนตัวเลือก — มีผลกับการจัดหน้ากระดาษโดยตรง】
@@ -7434,7 +7560,7 @@ ${bt.brief}
 ⛔ เพดานความยาก ห้ามเกินเด็ดขาด: ${t.bounds}
 หัวข้อย่อยที่ต้องครอบคลุมให้ครบทุกข้อ:
 ${t.subs.map(s=>'  - '+s).join('\n')}
-${bookBlock(p.grade, t.topic, '')}${archeBlock(p.grade, t.topic)}
+${bookBlock(p.grade, t.topic, '')}${archeBlock(p.grade, t.topic)}${libBlock({grade:p.grade, topic:t.topic})}
 ${houseStyle(p.grade)}
 
 ระดับความยากของแบบฝึกในบทนี้: ${p.level}
@@ -7972,12 +8098,512 @@ async function stuPlan(){
   }
 }
 
+
+/* ════════════════════════════════════════════════════════════════════
+   คลังความรู้ — โยนไฟล์ PDF / Word / รูป เข้ามา แล้วโปรแกรมถอดเป็นฐานข้อมูล
+   ให้ AI ใช้ตอนสร้างเอกสาร ข้อสอบ และหนังสือ โดยครูไม่ต้องรอให้ใครมาเขียนโค้ดเพิ่ม
+
+   ขั้นตอน: อ่านไฟล์ในเครื่อง → ส่งให้ AI ถอดเป็น JSON → ครูตรวจ → บันทึกเข้าคลัง
+   ⛔ สิ่งที่บันทึกคือ "โครงสร้าง สัดส่วน และแม่พิมพ์โจทย์" เท่านั้น
+      ไม่เก็บตัวโจทย์หรือข้อความจากต้นฉบับ ตามหลักการข้อ 1 ของโครงการ
+   ════════════════════════════════════════════════════════════════════ */
+
+const LIB_KEY = 'samath_lib_v1';
+const LIB_KINDS = [
+  { id:'blueprint', name:'พิมพ์เขียวข้อสอบ',
+    hint:'ข้อสอบเก่า / แนวข้อสอบ — ถอดเป็นสัดส่วนเนื้อหาและแม่พิมพ์โจทย์',
+    scope:'exam', tok:4000 },
+  { id:'arche', name:'แม่พิมพ์โจทย์รายบท',
+    hint:'หนังสือแบบฝึกหัด / ตะลุยโจทย์ — ถอดเป็นแบบของโจทย์ที่ออกบ่อย',
+    scope:'topic', tok:3600 },
+  { id:'outline', name:'โครงหนังสือและสารบัญ',
+    hint:'หนังสือเรียน — ถอดเป็นชื่อหน่วย หัวข้อย่อย และเลขหน้า',
+    scope:'topic', tok:3200 },
+  { id:'style', name:'ธรรมเนียมการเขียน',
+    hint:'ตัวอย่างเอกสารที่อยากให้เขียนตาม — ถอดเป็นแนวการใช้ภาษาและรูปแบบ',
+    scope:'grade', tok:2400 }
+];
+
+let LIB = { items:[] };
+function libLoad(){
+  try{ LIB = Object.assign({items:[]}, JSON.parse(localStorage.getItem(LIB_KEY)||'{}')); }
+  catch(e){ LIB = {items:[]}; }
+  if(!Array.isArray(LIB.items)) LIB.items = [];
+  return LIB;
+}
+function libSave(){ try{ localStorage.setItem(LIB_KEY, JSON.stringify(LIB)); }catch(e){} }
+function libAll(){ return libLoad().items; }
+function libAdd(rec){
+  libLoad();
+  rec.id = rec.id || ('lib_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6));
+  rec.ts = rec.ts || Date.now();
+  rec.on = (rec.on === undefined) ? true : rec.on;
+  LIB.items = LIB.items.filter(x=>x.id !== rec.id).concat([rec]);
+  libSave();
+  /* ขึ้นคลังกลางด้วย เพื่อให้เครื่องอื่นของครูคนเดียวกันได้ใช้ */
+  BANK.put('lib', 'lib_' + rec.id, {
+    title: rec.title, grade: rec.scope.grade||'', topic: rec.scope.topic||'',
+    dtype: rec.kind, html:'', data: rec, meta:{kind:rec.kind}
+  });
+  return rec;
+}
+function libDel(id){
+  libLoad();
+  LIB.items = LIB.items.filter(x=>x.id !== id);
+  libSave();
+  BANK.del('lib', 'lib_' + id);
+}
+function libToggle(id){
+  libLoad();
+  const r = LIB.items.find(x=>x.id===id);
+  if(r){ r.on = !r.on; libSave(); }
+  return r;
+}
+/* ── หาความรู้ที่ตรงกับงานที่กำลังทำ ── */
+function libMatch(kind, scope){
+  scope = scope || {};
+  return libAll().filter(r=>{
+    if(r.kind !== kind || r.on === false) return false;
+    const s = r.scope || {};
+    if(s.entId && scope.etype && s.entId !== scope.etype) return false;
+    if(s.tierId && scope.tier && s.tierId !== scope.tier) return false;
+    if(s.grade && scope.grade && s.grade !== scope.grade) return false;
+    if(s.topic && scope.topic && s.topic !== scope.topic) return false;
+    return true;
+  });
+}
+/* ── ก้อนคำสั่งที่แทรกเข้าไปในพรอมป์ต ── */
+function libBlock(scope){
+  const parts = [];
+  const bp = libMatch('blueprint', scope);
+  if(bp.length){
+    parts.push('\n【พิมพ์เขียวจากไฟล์ที่ครูอัปโหลดเข้าคลังความรู้】'
+      + bp.map(r=>`\n▸ ${r.title}${r.data.total?' (วิเคราะห์ '+r.data.total+' ข้อ)':''}\n`
+        + (r.data.groups||[]).map(g=>
+            `  • ${g.name} — ${g.pct||Math.round((g.count||0)/(r.data.total||1)*100)}% ของทั้งฉบับ\n`
+          + (g.arche||[]).map((a,i)=>`      แบบ ${i+1}. ${a}`).join('\n')).join('\n')).join(''));
+  }
+  const ar = libMatch('arche', scope);
+  if(ar.length){
+    parts.push('\n【แม่พิมพ์โจทย์จากไฟล์ที่ครูอัปโหลด — ให้ออกโจทย์ใหม่ตามแบบเหล่านี้】'
+      + ar.map(r=>'\n▸ ' + r.title + '\n'
+        + (r.data.groups||[]).map(g=>(g.arche||[]).map(a=>'      - '+a).join('\n')).join('\n')).join(''));
+  }
+  const ol = libMatch('outline', scope);
+  if(ol.length){
+    parts.push('\n【โครงหนังสือที่ครูอัปโหลด — ใช้เป็นลำดับการนำเสนอ】'
+      + ol.map(r=>'\n▸ ' + r.title + '\n'
+        + (r.data.groups||[]).map(g=>`      ${g.name}${g.page?' (หน้า '+g.page+')':''}`).join('\n')).join(''));
+  }
+  const st = libMatch('style', scope);
+  if(st.length){
+    parts.push('\n【ธรรมเนียมการเขียนที่ครูต้องการให้ทำตาม】'
+      + st.map(r=>'\n▸ ' + r.title + '\n' + (r.data.notes||[]).map(x=>'      - '+x).join('\n')).join(''));
+  }
+  if(!parts.length) return '';
+  return parts.join('\n') + '\n⛔ ใช้เป็น "แบบ" ในการออกของใหม่เท่านั้น ห้ามลอกตัวโจทย์หรือข้อความจากต้นฉบับ\n';
+}
+
+/* ══ อ่านไฟล์ในเครื่อง ══ */
+const CDN = {
+  pdf:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+  pdfw:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
+  mammoth:'https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js'
+};
+function loadScript(url){
+  return new Promise((res, rej)=>{
+    if(document.querySelector('script[data-lib="'+url+'"]')) return res();
+    const s = document.createElement('script');
+    s.src = url; s.async = true; s.setAttribute('data-lib', url);
+    s.onload = ()=>res();
+    s.onerror = ()=>rej(new Error('โหลดตัวอ่านไฟล์ไม่สำเร็จ — ตรวจอินเทอร์เน็ต'));
+    document.head.appendChild(s);
+  });
+}
+function readAsArrayBuffer(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = ()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsArrayBuffer(file);
+  });
+}
+function readAsText(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(String(r.result||''));
+    r.onerror = ()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsText(file);
+  });
+}
+function readAsDataURL(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(String(r.result||''));
+    r.onerror = ()=>rej(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    r.readAsDataURL(file);
+  });
+}
+function fileKind(f){
+  const n = (f.name||'').toLowerCase();
+  if(/\.pdf$/.test(n)) return 'pdf';
+  if(/\.docx?$/.test(n)) return 'word';
+  if(/\.(png|jpe?g|webp)$/.test(n)) return 'image';
+  if(/\.(txt|md|csv)$/.test(n)) return 'text';
+  return 'other';
+}
+/* หน้าที่ตัวอักษรน้อยแปลว่าเป็นหน้าสแกน ต้องส่งเป็นรูปให้ AI อ่านแทน */
+const SCAN_MIN_CHARS = 60;
+const MAX_VISION_PAGES = 12;
+
+async function extractFile(file, onProg){
+  const kind = fileKind(file);
+  const out = { name:file.name, kind:kind, text:'', pages:0, images:[], scanned:false };
+  if(kind === 'text'){
+    out.text = await readAsText(file);
+    out.pages = 1;
+    return out;
+  }
+  if(kind === 'image'){
+    const d = await readAsDataURL(file);
+    out.images.push({ media: (d.match(/^data:([^;]+);/)||[])[1] || 'image/jpeg', data: d.split(',')[1] });
+    out.scanned = true; out.pages = 1;
+    return out;
+  }
+  if(kind === 'word'){
+    await loadScript(CDN.mammoth);
+    const buf = await readAsArrayBuffer(file);
+    const r = await window.mammoth.extractRawText({ arrayBuffer: buf });
+    out.text = String((r && r.value) || '');
+    out.pages = 1;
+    if(!out.text.trim()) throw new Error('ไฟล์ Word นี้ไม่มีข้อความ (อาจเป็นไฟล์ .doc รุ่นเก่า ให้บันทึกเป็น .docx ก่อน)');
+    return out;
+  }
+  if(kind === 'pdf'){
+    await loadScript(CDN.pdf);
+    const pdfjs = window.pdfjsLib;
+    if(!pdfjs) throw new Error('ตัวอ่าน PDF ยังไม่พร้อม');
+    pdfjs.GlobalWorkerOptions.workerSrc = CDN.pdfw;
+    const buf = await readAsArrayBuffer(file);
+    const doc = await pdfjs.getDocument({ data: buf }).promise;
+    out.pages = doc.numPages;
+    let txt = '';
+    const scanPages = [];
+    for(let i=1; i<=doc.numPages; i++){
+      if(onProg) onProg(i, doc.numPages);
+      const pg = await doc.getPage(i);
+      const tc = await pg.getTextContent();
+      const line = tc.items.map(x=>x.str).join(' ').trim();
+      if(line.length >= SCAN_MIN_CHARS){ txt += '\n\n[หน้า ' + i + ']\n' + line; }
+      else { scanPages.push(pg); }
+    }
+    out.text = txt.trim();
+    if(scanPages.length){
+      out.scanned = true;
+      /* หน้าสแกน: วาดลงผืนผ้าใบแล้วส่งเป็นรูปให้ AI อ่าน จำกัดจำนวนหน้าไม่ให้คำขอใหญ่เกิน */
+      const take = scanPages.slice(0, MAX_VISION_PAGES);
+      for(let i=0; i<take.length; i++){
+        if(onProg) onProg(doc.numPages, doc.numPages, 'แปลงหน้าสแกน ' + (i+1) + '/' + take.length);
+        out.images.push(await pageToImage(take[i]));
+      }
+      out.skipped = scanPages.length - take.length;
+    }
+    if(!out.text && !out.images.length) throw new Error('อ่านเนื้อหาจาก PDF นี้ไม่ได้');
+    return out;
+  }
+  throw new Error('ยังไม่รองรับไฟล์ชนิดนี้ — ใช้ PDF, Word (.docx), รูปภาพ หรือไฟล์ข้อความ');
+}
+async function pageToImage(pg, scale){
+  const vp = pg.getViewport({ scale: scale || 1.6 });
+  const cv = document.createElement('canvas');
+  cv.width = Math.min(1600, Math.round(vp.width));
+  cv.height = Math.round(vp.height * (cv.width / vp.width));
+  const ctx = cv.getContext('2d');
+  await pg.render({ canvasContext: ctx, viewport: pg.getViewport({ scale: (cv.width / vp.width) * (scale||1.6) }) }).promise;
+  const d = cv.toDataURL('image/jpeg', 0.72);
+  return { media:'image/jpeg', data: d.split(',')[1] };
+}
+
+/* ══ ให้ AI ถอดไฟล์เป็นฐานข้อมูล ══ */
+function libPrompt(kind, scope, text, hasImg){
+  const k = LIB_KINDS.find(x=>x.id===kind) || LIB_KINDS[0];
+  const where = [
+    scope.grade ? 'ระดับชั้น ' + scope.grade : '',
+    scope.topic ? 'บท ' + scope.topic : '',
+    scope.entId ? 'สนามสอบ ' + (entOf(scope.entId)||{}).label : '',
+    scope.tierId && scope.entId ? 'ห้อง ' + (entTier(scope.entId, scope.tierId)||{}).name : ''
+  ].filter(Boolean).join(' · ');
+
+  const shape = {
+    blueprint:`{"total": จำนวนข้อที่วิเคราะห์ได้ทั้งหมด,
+ "groups":[{"name":"ชื่อจุดเน้นหรือหัวข้อ","count":จำนวนข้อที่พบ,"pct":ร้อยละของทั้งฉบับ,
+            "curr":["ชื่อบทในหลักสูตรที่ตรงกัน"],
+            "arche":["คำอธิบายแบบของโจทย์ที่พบ ไม่ใส่ตัวเลขของโจทย์จริง"]}]}`,
+    arche:`{"total": จำนวนโจทย์ที่วิเคราะห์ได้,
+ "groups":[{"name":"ชื่อกลุ่มโจทย์","count":จำนวนที่พบ,
+            "arche":["คำอธิบายแบบของโจทย์ เช่น ให้ผลรวมกับผลต่างแล้วหาจำนวนหนึ่ง"]}]}`,
+    outline:`{"groups":[{"name":"ชื่อหน่วยหรือหัวข้อย่อย","page":เลขหน้าที่พบ (ไม่มีให้ใส่ 0)}]}`,
+    style:`{"notes":["ข้อสังเกตเรื่องการใช้ภาษา รูปแบบการวางหัวข้อ วิธีแสดงวิธีทำ ฯลฯ"]}`
+  }[kind];
+
+  return `คุณคือผู้เชี่ยวชาญการวิเคราะห์ข้อสอบและตำราคณิตศาสตร์ไทย
+
+งาน: อ่าน${hasImg?'ภาพหน้าเอกสารและ':''}ข้อความต่อไปนี้ แล้วถอดออกมาเป็น "${k.name}"
+${where ? 'บริบทที่ครูระบุไว้: ' + where : ''}
+
+⛔ กฎลิขสิทธิ์ที่ห้ามผิดเด็ดขาด
+• ห้ามคัดลอกตัวโจทย์ ประโยค หรือข้อความใด ๆ จากต้นฉบับลงในผลลัพธ์
+• "arche" ต้องเป็นคำอธิบาย "แบบ" ของโจทย์ ไม่ใช่ตัวโจทย์ เช่น
+  เขียนว่า "ให้ผลรวมและผลต่างของสองจำนวน แล้วให้หาจำนวนที่มากกว่า"
+  ห้ามเขียนว่า "ผลรวมของสองจำนวนเท่ากับ 48 ผลต่างเท่ากับ 12 จงหา…"
+• ห้ามใส่ตัวเลขเจาะจงตั้งแต่สามหลักขึ้นไปในคำอธิบายแบบ
+• คำอธิบายแต่ละแบบต้องสั้นกว่า 200 ตัวอักษร
+
+${scope.grade ? 'เพดานเนื้อหา: ห้ามระบุแบบโจทย์ที่เกินหลักสูตรของชั้น ' + scope.grade : ''}
+${kind==='blueprint' || kind==='arche' ? 'ชื่อบทในช่อง curr ให้ใช้ชื่อบทจากรายการนี้เท่านั้น ถ้าไม่ตรงข้อใดให้เว้นเป็นรายการว่าง:\n' + (scope.grade ? topicsOf(scope.grade).map(t=>'  - '+t.topic).join('\n') : GRADES.slice(0,6).map(g=>topicsOf(g).map(t=>'  - '+t.topic).join('\n')).join('\n')) : ''}
+
+ตอบเป็น JSON อย่างเดียว ตามรูปนี้เป๊ะ ๆ ห้ามมีข้อความอื่นหุ้ม
+${shape}
+
+เนื้อหาที่ต้องวิเคราะห์:
+${text ? text.slice(0, 60000) : '(อยู่ในภาพที่แนบมา)'}`;
+}
+function libClean(kind, obj, scope){
+  /* ยามกันลิขสิทธิ์ฝั่งเรา: ตัดแบบที่ยาวเกินหรือมีตัวเลขเจาะจงหลายหลักทิ้ง */
+  const trimA = a => String(a||'').replace(/\s+/g,' ').trim();
+  const okA = a => a && a.length < 200 && !/\d{3,}/.test(a);
+  const out = { total:+obj.total || 0, groups:[], notes:[] };
+  (obj.notes||[]).forEach(n=>{ const t = trimA(n); if(okA(t)) out.notes.push(t); });
+  (obj.groups||[]).forEach(g=>{
+    const arche = (g.arche||[]).map(trimA).filter(okA);
+    const curr = (g.curr||[]).filter(c => !scope.grade || !!findTopic(scope.grade, c) || !!findTopicAnyGrade(c));
+    if(!g.name) return;
+    out.groups.push({ name: trimA(g.name), count:+g.count||0, pct:+g.pct||0,
+                      page:+g.page||0, curr:curr, arche:arche });
+  });
+  if(!out.total) out.total = out.groups.reduce((a,g)=>a+(g.count||0), 0);
+  return out;
+}
+
+/* ── หน้าจอคลังความรู้ ─────────────────────────────────────────────── */
+let libFiles = [];      /* ไฟล์ที่เลือกไว้ พร้อมผลการอ่าน */
+let libDraft = null;    /* ผลถอดที่รอครูตรวจก่อนบันทึก */
+let libKind = 'blueprint';
+
+function initLibUI(){
+  libLoad();
+  document.getElementById('libKindGrid').innerHTML = LIB_KINDS.map(k=>
+    `<button class="dt${k.id===libKind?' on':''}" data-lk="${k.id}" onclick="pickLibKind('${k.id}')">
+       <span>${esc(k.name)}<small>${esc(k.hint)}</small></span></button>`).join('');
+  fillSel('libGrade', [{v:'',t:'— ไม่ระบุ —'}].concat(GRADES.map(g=>({v:g,t:g}))), '');
+  fillSel('libEnt', [{v:'',t:'— ไม่ผูกกับสนามสอบ —'}]
+    .concat(Object.keys(ENTRANCE).map(id=>({v:id, t:ENTRANCE[id].label}))), '');
+  libOnGrade(); libOnEnt(); pickLibKind(libKind); libList();
+}
+function pickLibKind(id){
+  libKind = id;
+  document.querySelectorAll('#libKindGrid .dt').forEach(b=>b.classList.toggle('on', b.dataset.lk===id));
+  const k = LIB_KINDS.find(x=>x.id===id) || LIB_KINDS[0];
+  document.getElementById('libEntWrap').style.display = (k.scope==='exam') ? '' : 'none';
+  document.getElementById('libTopicWrap').style.display = (k.scope==='topic') ? '' : 'none';
+}
+function libOnGrade(){
+  const g = document.getElementById('libGrade').value;
+  fillSel('libTopic', [{v:'',t:'— ทั้งระดับชั้น —'}]
+    .concat(g ? topicsOf(g).map(t=>({v:t.topic,t:t.topic})) : []), '');
+}
+function libOnEnt(){
+  const id = document.getElementById('libEnt').value;
+  const e = entOf(id);
+  fillSel('libTier', e ? e.tiers.map(t=>({v:t.id,t:t.name})) : [{v:'',t:'— ไม่ระบุห้อง —'}]);
+}
+function libScope(){
+  const k = LIB_KINDS.find(x=>x.id===libKind) || LIB_KINDS[0];
+  const s = { grade: document.getElementById('libGrade').value || '' };
+  if(k.scope==='topic') s.topic = document.getElementById('libTopic').value || '';
+  if(k.scope==='exam'){
+    s.entId = document.getElementById('libEnt').value || '';
+    if(s.entId) s.tierId = document.getElementById('libTier').value || '';
+  }
+  return s;
+}
+/* ── รับไฟล์ ── */
+function libPickFiles(){ document.getElementById('libFile').click(); }
+function libOnDrop(ev){
+  ev.preventDefault();
+  document.getElementById('libDropZone').classList.remove('over');
+  libTakeFiles((ev.dataTransfer && ev.dataTransfer.files) || []);
+}
+function libDragOver(ev){ ev.preventDefault(); document.getElementById('libDropZone').classList.add('over'); }
+function libDragOut(){ document.getElementById('libDropZone').classList.remove('over'); }
+async function libTakeFiles(files){
+  const list = Array.from(files||[]);
+  if(!list.length) return;
+  for(const f of list){
+    if(fileKind(f)==='other'){ toast('ข้ามไฟล์ ' + f.name + ' — ยังไม่รองรับชนิดนี้'); continue; }
+    const row = { name:f.name, size:f.size, state:'กำลังอ่าน…', data:null, err:'' };
+    libFiles.push(row); libPaintFiles();
+    try{
+      row.data = await extractFile(f, (i,n,msg)=>{
+        row.state = msg || ('กำลังอ่านหน้า ' + i + '/' + n); libPaintFiles();
+      });
+      row.state = row.data.scanned
+        ? ('หน้าสแกน ' + row.data.images.length + ' หน้า' + (row.data.text ? ' + ข้อความ' : ''))
+        : ('อ่านข้อความได้ ' + row.data.text.length.toLocaleString() + ' ตัวอักษร');
+    }catch(e){
+      row.err = e.message; row.state = 'อ่านไม่สำเร็จ';
+    }
+    libPaintFiles();
+  }
+  document.getElementById('libFile').value = '';
+}
+function libPaintFiles(){
+  const host = document.getElementById('libFiles');
+  if(!host) return;
+  host.innerHTML = libFiles.length ? libFiles.map((f,i)=>
+    `<div class="orow${f.err?' off':''}">
+       <span class="on-n">${i+1}</span>
+       <span class="on-t">${esc(f.name)}<small>${esc(f.err || f.state)}</small></span>
+       <span class="on-b"><button class="btn btn-ghost btn-sm" onclick="libDropFile(${i})">✕</button></span>
+     </div>`).join('') : '';
+  const ready = libFiles.filter(f=>f.data && !f.err).length;
+  const btn = document.getElementById('libGoBtn');
+  if(btn) btn.disabled = !ready;
+  const n = document.getElementById('libFileNote');
+  if(n) n.textContent = libFiles.length ? ('พร้อมถอด ' + ready + ' ไฟล์') : '';
+}
+function libDropFile(i){ libFiles.splice(i,1); libPaintFiles(); }
+function libClear(){ libFiles = []; libDraft = null; libPaintFiles(); document.getElementById('libDraft').innerHTML = ''; }
+
+/* ── ถอดเป็นฐานข้อมูล ── */
+async function libExtract(){
+  const ready = libFiles.filter(f=>f.data && !f.err);
+  if(!ready.length){ toast('ยังไม่มีไฟล์ที่อ่านได้'); return; }
+  const scope = libScope();
+  const k = LIB_KINDS.find(x=>x.id===libKind) || LIB_KINDS[0];
+  const prog = document.getElementById('libProg');
+  prog.style.display = 'block';
+  document.getElementById('libProgFill').style.width = '15%';
+  document.getElementById('libProgTxt').textContent = 'กำลังให้ AI ถอดเป็นฐานข้อมูล…';
+  const merged = { total:0, groups:[], notes:[] };
+  let errs = [];
+  try{
+    for(let i=0;i<ready.length;i++){
+      const f = ready[i];
+      document.getElementById('libProgFill').style.width = (15 + Math.round((i+1)/ready.length*75)) + '%';
+      document.getElementById('libProgTxt').textContent = 'กำลังถอด ' + f.name + ' (' + (i+1) + '/' + ready.length + ')';
+      try{
+        const res = await callAI(libPrompt(libKind, scope, f.data.text, !!f.data.images.length),
+          { model: CFG.model, maxTok: k.tok, images: f.data.images.slice(0, MAX_VISION_PAGES) });
+        const obj = safeJSON(res.text);
+        const one = libClean(libKind, (Array.isArray(obj) ? obj[0] : obj) || {}, scope);
+        merged.total += one.total;
+        one.groups.forEach(g=>{
+          const hit = merged.groups.find(x=>x.name===g.name);
+          if(hit){
+            hit.count += g.count;
+            g.arche.forEach(a=>{ if(hit.arche.indexOf(a)<0) hit.arche.push(a); });
+            g.curr.forEach(c=>{ if(hit.curr.indexOf(c)<0) hit.curr.push(c); });
+          } else merged.groups.push(g);
+        });
+        one.notes.forEach(n=>{ if(merged.notes.indexOf(n)<0) merged.notes.push(n); });
+      }catch(e){ errs.push(f.name + ': ' + e.message); }
+    }
+  }finally{
+    prog.style.display = 'none';
+  }
+  if(!merged.groups.length && !merged.notes.length){
+    document.getElementById('libDraft').innerHTML =
+      `<div class="note err"><b>ถอดไม่สำเร็จ</b><br>${esc(errs.join(' · ') || 'ไม่พบโครงสร้างที่ถอดได้')}</div>`;
+    return;
+  }
+  merged.groups.sort((a,b)=>b.count-a.count);
+  merged.groups.forEach(g=>{ g.pct = merged.total ? Math.round(g.count/merged.total*100) : 0; });
+  libDraft = {
+    kind: libKind, scope: scope,
+    title: (LIB_KINDS.find(x=>x.id===libKind)||{}).name + ' · ' + ready.map(f=>f.name.replace(/\.[^.]+$/,'')).join(', ').slice(0,60),
+    data: merged, src: ready.map(f=>f.name), on:true
+  };
+  libPaintDraft(errs);
+}
+function libPaintDraft(errs){
+  const host = document.getElementById('libDraft');
+  if(!libDraft){ host.innerHTML=''; return; }
+  const d = libDraft.data;
+  host.innerHTML =
+    (errs && errs.length ? `<div class="note warn">บางไฟล์ถอดไม่สำเร็จ — ${esc(errs.join(' · '))}</div>` : '')
+    + `<div class="note info"><b>ตรวจก่อนบันทึก</b> — แก้ชื่อได้ ถ้ามีแบบไหนไม่ตรงให้กดลบทิ้งก่อนบันทึก</div>
+       <div class="fld"><label for="libTitle">ชื่อที่จะเก็บในคลัง</label>
+         <input type="text" id="libTitle" value="${esc(libDraft.title)}"></div>`
+    + (d.groups.length ? `<table><thead><tr><th>หัวข้อที่พบ</th><th style="width:90px">สัดส่วน</th>
+        <th>แม่พิมพ์โจทย์</th><th style="width:50px"></th></tr></thead><tbody>`
+      + d.groups.map((g,i)=>`<tr>
+          <td>${esc(g.name)}${g.curr && g.curr.length?'<br><span class="small mut">'+esc(g.curr.join(' · '))+'</span>':''}</td>
+          <td>${g.count?g.count+' ข้อ<br>':''}${g.pct?g.pct+'%':(g.page?'หน้า '+g.page:'—')}</td>
+          <td>${g.arche.length ? '<ul style="margin:0 0 0 16px">'+g.arche.map((a,j)=>
+                `<li>${esc(a)} <button class="btn btn-ghost btn-sm" onclick="libDropArche(${i},${j})">✕</button></li>`).join('')+'</ul>' : '—'}</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="libDropGroup(${i})">✕</button></td></tr>`).join('')
+      + `</tbody></table>` : '')
+    + (d.notes.length ? `<h4 class="mt20 mb10">ธรรมเนียมการเขียนที่ถอดได้</h4><ul>`
+        + d.notes.map((n,i)=>`<li>${esc(n)} <button class="btn btn-ghost btn-sm" onclick="libDropNote(${i})">✕</button></li>`).join('')
+        + `</ul>` : '')
+    + `<div class="pkbar mt10">
+         <button class="btn btn-primary" onclick="libSaveDraft()">บันทึกเข้าคลังความรู้</button>
+         <button class="btn btn-ghost btn-sm" onclick="libClear()">ทิ้งผลนี้</button>
+         <span class="pkcount">ถอดได้ ${d.groups.length} หัวข้อ · ${d.groups.reduce((a,g)=>a+g.arche.length,0)} แม่พิมพ์</span>
+       </div>`;
+}
+function libDropGroup(i){ libDraft.data.groups.splice(i,1); libPaintDraft(); }
+function libDropArche(i,j){ libDraft.data.groups[i].arche.splice(j,1); libPaintDraft(); }
+function libDropNote(i){ libDraft.data.notes.splice(i,1); libPaintDraft(); }
+function libSaveDraft(){
+  if(!libDraft){ toast('ยังไม่มีผลที่จะบันทึก'); return; }
+  libDraft.title = (document.getElementById('libTitle').value||'').trim() || libDraft.title;
+  libAdd(JSON.parse(JSON.stringify(libDraft)));
+  toast('บันทึกเข้าคลังความรู้แล้ว — จะถูกใช้ตอนสร้างเอกสารและข้อสอบโดยอัตโนมัติ');
+  libClear(); libList(); refreshDash();
+}
+/* ── รายการความรู้ที่บันทึกไว้ ── */
+function libList(){
+  const host = document.getElementById('libSaved');
+  if(!host) return;
+  const rows = libAll().slice().sort((a,b)=>b.ts-a.ts);
+  const chip = document.getElementById('libCountChip');
+  if(chip) chip.textContent = rows.length ? (rows.length + ' ชิ้น · ใช้อยู่ ' + rows.filter(r=>r.on!==false).length) : 'ยังว่าง';
+  if(!rows.length){
+    host.innerHTML = '<div class="empty"><div class="empty-ico">▤</div><h4>คลังความรู้ยังว่าง</h4>'
+      + '<p>อัปโหลดไฟล์ทางซ้าย แล้วกดถอดเป็นฐานข้อมูล</p></div>';
+    return;
+  }
+  host.innerHTML = `<table><thead><tr><th>ชื่อ</th><th style="width:130px">ชนิด</th>
+      <th style="width:150px">ใช้กับ</th><th style="width:90px">ขนาด</th><th style="width:120px"></th></tr></thead><tbody>`
+    + rows.map(r=>{
+        const s = r.scope||{};
+        const where = [s.grade, s.topic, s.entId ? (entOf(s.entId)||{}).label : '',
+          s.tierId && s.entId ? (entTier(s.entId,s.tierId)||{}).name : ''].filter(Boolean).join(' · ') || 'ทุกงาน';
+        const nA = (r.data.groups||[]).reduce((a,g)=>a+(g.arche||[]).length,0) + (r.data.notes||[]).length;
+        return `<tr${r.on===false?' style="opacity:.5"':''}>
+          <td>${esc(r.title)}<br><span class="small mut">${esc((r.src||[]).join(', '))}</span></td>
+          <td>${esc((LIB_KINDS.find(k=>k.id===r.kind)||{}).name||r.kind)}</td>
+          <td>${esc(where)}</td>
+          <td>${(r.data.groups||[]).length} หัวข้อ<br><span class="small mut">${nA} แม่พิมพ์</span></td>
+          <td><button class="btn btn-ghost btn-sm" onclick="libToggleUI('${r.id}')">${r.on===false?'เปิดใช้':'พักไว้'}</button>
+              <button class="btn btn-ghost btn-sm" onclick="libDelUI('${r.id}')">ลบ</button></td></tr>`;
+      }).join('')
+    + `</tbody></table>`;
+}
+function libToggleUI(id){ libToggle(id); libList(); }
+function libDelUI(id){
+  if(!confirm('ลบความรู้ชิ้นนี้ออกจากคลัง?')) return;
+  libDel(id); libList(); refreshDash();
+}
+
 /* ════════════════════════════════════════════════════════════════════
    UI SHELL — เส้นทางหน้าจอ, แดชบอร์ด, คลังกลาง, ตั้งค่า, ส่งออก
    ════════════════════════════════════════════════════════════════════ */
 
 const PAGE_TITLE = {dash:'หน้าหลัก', book:'สตูดิโอหนังสือ', doc:'สร้างเอกสาร', exam:'สตูดิโอข้อสอบ',
-                    stu:'นักเรียน', repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
+                    stu:'นักเรียน', lib:'คลังความรู้', repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
 
 /* ── ขนาดตัวอักษรทั้งโปรแกรม 90–140% เก็บค่าไว้ให้ครั้งหน้าเปิดมาเท่าเดิม ── */
 const ZOOM_STEPS = [90, 100, 110, 120, 130, 140];
@@ -8009,6 +8635,7 @@ function go(page){
   document.querySelector('.main').scrollTop = 0;
   if(page==='dash') refreshDash();
   if(page==='stu')  initStuUI();
+  if(page==='lib')  initLibUI();
   if(page==='repo') renderRepo();
   if(page==='curr') renderCurr();
   if(page==='set')  fillCfgForm();
@@ -8121,7 +8748,7 @@ function renderRepo(){
   const grade = document.getElementById('rGrade').value;
   const q = (document.getElementById('rSearch').value||'').trim().toLowerCase();
   let rows = [];
-  ['doc','exam','item','book'].forEach(k=>{ if(kind==='all'||kind===k) rows = rows.concat(BANK.all(k)); });
+  ['doc','exam','item','book','lib'].forEach(k=>{ if(kind==='all'||kind===k) rows = rows.concat(BANK.all(k)); });
   rows = rows.filter(r=>{
     if(grade!=='all' && r.grade!==grade) return false;
     if(q){
@@ -8161,6 +8788,7 @@ function openRec(kind, key){
   BANK.touch(kind, key);
   if(kind==='doc'){ go('doc'); docCurrent=r; paintDoc(r,{reused:true, saved:0}); }
   else if(kind==='exam'){ go('exam'); examCurrent=r; paintExam(r,{reused:true, saved:0}); }
+  else if(kind==='lib'){ go('lib'); }
   else if(kind==='book'){
     go('book'); bookCurrent=r;
     document.getElementById('bookPaper').innerHTML = r.html||'';
@@ -8181,6 +8809,12 @@ function viewRec(kind, key){
       ${Array.isArray(q.choices)?'<ol type="a">'+q.choices.map((c,i)=>`<li${i===q.ans?' style="font-weight:700;color:var(--teal)"':''}>${c}</li>`).join('')+'</ol>':'<p><strong>คำตอบ</strong> '+esc(q.answer||'')+'</p>'}
       <div class="ansbox"><strong>วิธีทำ</strong><br>${q.explain||''}</div>
       <p class="small mut">ทักษะ: ${esc(q.skill||'—')} · ระดับ: ${esc((r.meta&&r.meta.level)||'—')} · ใช้ซ้ำ ${r.hits||0} ครั้ง</p></div>`;
+  } else if(kind==='lib'){
+    const g = (r.data && r.data.data && r.data.data.groups) || [];
+    html = `<p class="small mut">ความรู้ที่ถอดจากไฟล์: ${esc((r.data&&r.data.src||[]).join(', '))}</p>`
+      + (g.length ? '<ul>' + g.map(x=>`<li><strong>${esc(x.name)}</strong>${x.pct?' — '+x.pct+'%':''}`
+          + (x.arche&&x.arche.length ? '<ul>'+x.arche.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul>' : '')
+          + '</li>').join('') + '</ul>' : '<p>ไม่มีหัวข้อย่อย</p>');
   } else if(kind==='doc' || kind==='book'){
     html = `<div class="paper" style="padding:0">${r.html||''}</div>`;
   } else {
@@ -8212,9 +8846,11 @@ async function syncPull(){
   renderRepo(); refreshDash();
   toast(`ดึงมาใหม่ ${r.doc} เอกสาร · ${r.exam} ชุดข้อสอบ · ${r.item} ข้อ`);
 }
-function syncWarn(msg){
+function syncWarn(){
+  /* รับได้หลายบรรทัด แล้วต่อด้วย <br> ให้เอง ป้องกันแท็กดิบโผล่บนหน้าจอ */
+  const lines = Array.prototype.slice.call(arguments).filter(Boolean).map(x=>esc(String(x)));
   const el = document.getElementById('syncStatus');
-  if(el) el.innerHTML = `<div class="note err"><b>ส่งขึ้นคลังกลางไม่สำเร็จ</b><br>${esc(msg||'')}</div>`;
+  if(el) el.innerHTML = `<div class="note err"><b>ส่งขึ้นคลังกลางไม่สำเร็จ</b><br>${lines.join('<br>')}</div>`;
   toast('ส่งขึ้นคลังกลางไม่สำเร็จ');
 }
 function syncOK(msg){
@@ -8232,8 +8868,9 @@ async function syncPush(force){
     syncOK('ส่งขึ้นคลังกลางครบแล้ว ' + (r.sent||pending) + ' ชิ้น — เปิด Google Sheet ดูได้เลย');
     toast('ส่งขึ้นคลังกลางแล้ว');
   } else if(!r.ok){
-    syncWarn('ส่งไปได้ ' + (r.sent||0) + ' ชิ้น · ยังค้าง ' + BANK.outCount() + ' ชิ้น<br>'
-      + esc(r.error||'') + '<br>ของที่ค้างยังอยู่ในคิว โปรแกรมจะลองส่งเองอีกครั้งให้อัตโนมัติ');
+    syncWarn('ส่งไปได้ ' + (r.sent||0) + ' ชิ้น · ยังค้าง ' + BANK.outCount() + ' ชิ้น',
+      r.error || '',
+      'ของที่ค้างยังอยู่ในคิว โปรแกรมจะลองส่งเองอีกครั้งให้อัตโนมัติ');
   }
   renderSyncBadge(); refreshDash();
 }
@@ -8286,7 +8923,7 @@ function importBank(input){
       if(!d.db) throw new Error('ไฟล์ไม่ถูกต้อง');
       BANK._load();
       let n=0;
-      ['doc','exam','item','book'].forEach(k=>{
+      ['doc','exam','item','book','lib'].forEach(k=>{
         Object.keys(d.db[k]||{}).forEach(key=>{ if(!BANK.db[k][key]){ BANK.db[k][key]=d.db[k][key]; n++; } });
       });
       if(d.meta && d.meta.savedUSD) BANK.meta.savedUSD = Math.max(BANK.meta.savedUSD||0, d.meta.savedUSD);
@@ -8568,6 +9205,7 @@ function startApp(){
   initExamUI();
   initBookUI();
   stuLoad();
+  libLoad();
   applyZoom();
   fillCfgForm();
   go('dash');
@@ -9338,6 +9976,172 @@ ok('คลังกลางมีตัวกรองหนังสือใ�
     ok('ส่งสำเร็จแล้วติดธงว่าขึ้นชีตแล้ว', BANK.db.doc['__selftest__'].synced === 1);
     if(keep) BANK.db.doc['__selftest__'] = keep; else delete BANK.db.doc['__selftest__'];
     BANK._save();
+
+    /* ══ 9ข. ยามกันฟังก์ชันหาย ══
+       เคยเกิดมาแล้ว: BANK.post หายไปทั้งตัว ของค้างคิวหลายร้อยชิ้นโดยไม่มีใครรู้
+       เพราะเทสต์เดิมสวมตัวส่งจำลองทับ จึงไม่เคยแตะของจริง สองชุดนี้ไล่ตรวจว่า
+       ทุกฟังก์ชันที่ถูกเรียกใช้ "มีอยู่จริง" ทั้งในคลังและในปุ่มบนหน้าจอ */
+    ok('BANK.post มีอยู่จริงและเป็นฟังก์ชัน', typeof BANK.post === 'function');
+    (function(){
+      const src = Object.keys(BANK).map(k => typeof BANK[k] === 'function' ? BANK[k].toString() : '').join('\n');
+      const called = Array.from(new Set((src.match(/this\.([A-Za-z_$][\w$]*)\s*\(/g) || [])
+        .map(x => x.replace(/^this\./, '').replace(/\s*\($/, ''))));
+      const missing = called.filter(m => typeof BANK[m] !== 'function');
+      ok('ทุกเมท็อดที่คลังเรียกใช้ภายในตัวเองมีอยู่ครบ', missing.length === 0, 'ขาด: ' + missing.join(', '));
+      ok('ตรวจเจอเมท็อดของคลังไม่น้อยกว่า 10 ตัว', called.length >= 10, called.length + ' ตัว');
+    })();
+    (function(){
+      /* ปุ่มทุกปุ่มบนหน้าจอต้องชี้ไปยังฟังก์ชันที่มีจริง */
+      const seen = {}, bad = [];
+      Array.from(d.querySelectorAll('*')).forEach(el=>{
+        Array.from(el.attributes || []).forEach(a=>{
+          if(a.name.indexOf('on') !== 0) return;
+          /* เอาเฉพาะชื่อที่ถูกเรียกลอย ๆ ไม่ใช่เมท็อดที่ห้อยอยู่หลังจุด */
+          (a.value.match(/(^|[^.\w$])([A-Za-z_$][\w$]*)\s*\(/g) || []).forEach(x=>{
+            const fn = x.replace(/^[^A-Za-z_$]*/, '').replace(/\s*\($/, '');
+            if(seen[fn]) return;
+            seen[fn] = 1;
+            if(['if','for','while','switch','catch','return','typeof','function','new'].indexOf(fn) >= 0) return;
+            if(typeof window[fn] !== 'function') bad.push(fn + ' @' + (el.id || el.tagName.toLowerCase()));
+          });
+        });
+      });
+      ok('ทุกปุ่มบนหน้าจอเรียกฟังก์ชันที่มีอยู่จริง', bad.length === 0, bad.slice(0,6).join(' · '));
+      ok('ตรวจปุ่มได้ไม่น้อยกว่า 30 ฟังก์ชัน', Object.keys(seen).length >= 30, Object.keys(seen).length + ' ตัว');
+    })();
+    /* ── ส่งจริงผ่าน fetch จำลอง เพื่อพิสูจน์ว่า BANK.post ทำงานได้ ไม่ใช่แค่มีชื่อ ── */
+    await (async function(){
+      const realFetch = window.fetch;
+      let got = null;
+      try{
+        window.fetch = async function(url, opt){
+          got = {url:url, opt:opt};
+          return { ok:true, status:200, text: async()=>JSON.stringify({ok:true, done:1}) };
+        };
+        const r = await BANK.post({action:'put', kind:'doc', key:'probe'});
+        {
+          ok('post ส่งไปที่ URL ของคลังกลาง', got && got.url === CFG.url);
+          ok('post ใช้วิธี POST', got && got.opt.method === 'POST');
+          ok('post ใช้ text/plain เพื่อเลี่ยง preflight ที่ Apps Script ไม่รองรับ',
+            got && /text\/plain/.test(got.opt.headers['Content-Type']));
+          ok('post แนบรหัสผ่านให้เองทุกครั้ง', got && JSON.parse(got.opt.body).password !== undefined);
+          ok('post คืนค่าที่ชีตตอบกลับมา', r && r.ok === true && r.done === 1);
+        }
+      } finally { window.fetch = realFetch; }
+    })();
+    await (async function(){
+      const realFetch = window.fetch;
+      try{
+        window.fetch = async function(){ return { ok:true, status:200,
+          text: async()=>'<html>Sorry, the file you have requested does not exist</html>' }; };
+        const r = await BANK.post({action:'ping'});
+        ok('deployment ตาย → บอกให้ไป Deploy ใหม่ ไม่ใช่ error ดิบ',
+          r.ok === false && r.error.indexOf('Deploy ใหม่') >= 0, r.error);
+      } finally { window.fetch = realFetch; }
+    })();
+    await (async function(){
+      const realFetch = window.fetch;
+      try{
+        window.fetch = async function(){ throw new Error('Failed to fetch'); };
+        const r = await BANK.post({action:'ping'});
+        ok('เน็ตหลุด → คืนค่าปกติ ไม่โยน error ให้คิวพัง', r.ok === false && !!r.error);
+      } finally { window.fetch = realFetch; }
+    })();
+
+
+    /* ══ 13. คลังความรู้จากไฟล์ที่ครูอัปโหลด ══ */
+    ok('มีชนิดความรู้ให้เลือกครบ 4 แบบ', LIB_KINDS.length === 4 &&
+      ['blueprint','arche','outline','style'].every(id => LIB_KINDS.some(k=>k.id===id)));
+    ok('ทุกชนิดมีคำอธิบายและงบโทเคน', LIB_KINDS.every(k=>!!k.name && !!k.hint && k.tok > 1000));
+    ok('แยกชนิดไฟล์ได้ถูกต้อง',
+      fileKind({name:'a.PDF'})==='pdf' && fileKind({name:'b.docx'})==='word' &&
+      fileKind({name:'c.jpg'})==='image' && fileKind({name:'d.txt'})==='text' &&
+      fileKind({name:'e.zip'})==='other');
+    ok('มีเมนูคลังความรู้และหน้าจอรองรับ',
+      !!d.querySelector('.rail-btn[data-page="lib"]') && !!d.getElementById('pg-lib') && !!PAGE_TITLE.lib);
+    ok('มีกล่องลากไฟล์มาวาง', !!d.getElementById('libDropZone') && !!d.getElementById('libFile'));
+    /* อ่านไฟล์ข้อความจริงผ่าน FileReader */
+    await (async function(){
+      try{
+        const f = new File(['บทที่ 1 ร้อยละ\nโจทย์ตัวอย่าง'], 'ทดสอบ.txt', {type:'text/plain'});
+        const r = await extractFile(f);
+        ok('อ่านไฟล์ข้อความในเครื่องได้จริง', r.kind==='text' && r.text.indexOf('ร้อยละ') >= 0);
+      }catch(e){ ok('อ่านไฟล์ข้อความในเครื่องได้จริง', false, e.message); }
+      try{
+        await extractFile(new File(['x'], 'a.zip'));
+        ok('ไฟล์ชนิดที่ไม่รองรับต้องบอกให้ชัด', false, 'ไม่ได้เตือน');
+      }catch(e){ ok('ไฟล์ชนิดที่ไม่รองรับต้องบอกให้ชัด', e.message.indexOf('ยังไม่รองรับ') >= 0); }
+    })();
+    /* ยามลิขสิทธิ์ตอนถอด */
+    (function(){
+      const raw = { total:50, groups:[
+        { name:'ร้อยละ', count:10, curr:['ร้อยละ ป.6','บทที่ไม่มีจริง'],
+          arche:['ให้ราคาทุนกับราคาขาย แล้วหากำไรเป็นร้อยละ',
+                 'ผลรวมของสองจำนวนเท่ากับ 4875 ผลต่างเท่ากับ 231 จงหาจำนวนที่มากกว่า'] },
+        { name:'ยาวเกิน', count:2, arche:[new Array(230).join('ก')] } ] };
+      const c = libClean('blueprint', raw, {grade:'ป.6'});
+      ok('ตัดแม่พิมพ์ที่มีตัวเลขเจาะจงสามหลักขึ้นไปทิ้ง',
+        c.groups[0].arche.length === 1 && !/\d{3,}/.test(c.groups[0].arche[0]));
+      ok('ตัดแม่พิมพ์ที่ยาวเกิน 200 ตัวอักษรทิ้ง', c.groups[1].arche.length === 0);
+      ok('ตัดชื่อบทที่ไม่มีในหลักสูตรทิ้ง',
+        c.groups[0].curr.length === 1 && c.groups[0].curr[0] === 'ร้อยละ ป.6');
+      ok('คำนวณยอดรวมให้เองเมื่อ AI ไม่ได้ส่งมา',
+        libClean('arche', {groups:[{name:'ก', count:3, arche:['แบบหนึ่ง']}]}, {}).total === 3);
+    })();
+    /* พรอมป์ตถอดไฟล์ */
+    (function(){
+      const pr = libPrompt('blueprint', {grade:'ป.6', entId:'ent_m1', tierId:'gifted'}, 'เนื้อหา', false);
+      ok('พรอมป์ตถอดไฟล์ห้ามคัดลอกตัวโจทย์', pr.indexOf('ห้ามคัดลอกตัวโจทย์') >= 0);
+      ok('พรอมป์ตถอดไฟล์ห้ามใส่ตัวเลขสามหลัก', pr.indexOf('สามหลักขึ้นไป') >= 0);
+      ok('พรอมป์ตถอดไฟล์คุมเพดานตามชั้นที่ระบุ', pr.indexOf('เพดานเนื้อหา') >= 0);
+      ok('พรอมป์ตถอดไฟล์ให้เลือกชื่อบทจากหลักสูตรจริงเท่านั้น',
+        pr.indexOf('ห.ร.ม. และ ค.ร.น.') >= 0);
+      ok('พรอมป์ตบอกบริบทสนามสอบและห้องที่ครูผูกไว้',
+        pr.indexOf('สอบเข้า ม.1') >= 0 && pr.indexOf('Gifted') >= 0);
+      ok('ไฟล์สแกนที่ส่งเป็นภาพ พรอมป์ตต้องบอกว่าเนื้อหาอยู่ในภาพ',
+        libPrompt('arche', {}, '', true).indexOf('อยู่ในภาพที่แนบมา') >= 0);
+    })();
+    /* บันทึก ใช้งาน และเลิกใช้ */
+    (function(){
+      const _items = JSON.parse(JSON.stringify(libAll()));
+      try{
+        const rec = libAdd({ kind:'blueprint', title:'ทดสอบคลังความรู้',
+          scope:{grade:'ป.6', topic:'ร้อยละ ป.6', entId:'ent_m1', tierId:'gifted'},
+          data:{ total:20, groups:[{name:'กำไรขาดทุน', count:20, pct:100, curr:['ร้อยละ ป.6'],
+                 arche:['ให้ราคาทุนกับร้อยละของกำไร แล้วหาราคาขาย']}], notes:[] },
+          src:['ทดสอบ.pdf'] });
+        ok('บันทึกความรู้ลงเครื่องได้', libAll().some(x=>x.id===rec.id));
+        ok('ความรู้ถูกส่งขึ้นคลังกลางด้วย', !!BANK.get('lib', 'lib_'+rec.id));
+        const blk = libBlock({grade:'ป.6', topic:'ร้อยละ ป.6', etype:'ent_m1', tier:'gifted'});
+        ok('ความรู้ถูกดึงมาใช้เมื่อขอบเขตตรงกัน', blk.indexOf('กำไรขาดทุน') >= 0);
+        ok('ก้อนความรู้ย้ำห้ามลอกตัวโจทย์', blk.indexOf('ห้ามลอกตัวโจทย์') >= 0);
+        ok('ขอบเขตไม่ตรงต้องไม่ถูกดึงมา',
+          libBlock({grade:'ม.3', topic:'อะไรก็ได้'}) === '');
+        ok('ห้องที่สอบไม่ตรงต้องไม่ถูกดึงมา',
+          libBlock({grade:'ป.6', topic:'ร้อยละ ป.6', etype:'ent_m1', tier:'normal'}) === '');
+        /* เข้าไปอยู่ในพรอมป์ตของข้อสอบและของหนังสือจริง */
+        const ip = itemPrompt({grade:'ป.6', fmt:'mcq4', note:'', etype:'ent_m1', tier:'gifted'},
+          { tObj: findTopic('ป.6','ร้อยละ ป.6'), sub:'', level:'ปานกลาง', grade:'ป.6' }, 4);
+        ok('ความรู้ของครูถูกแทรกเข้าพรอมป์ตข้อสอบ', ip.indexOf('กำไรขาดทุน') >= 0);
+        libToggle(rec.id);
+        ok('พักการใช้แล้วต้องไม่ถูกดึงมาอีก',
+          libBlock({grade:'ป.6', topic:'ร้อยละ ป.6', etype:'ent_m1', tier:'gifted'}) === '');
+        libToggle(rec.id);
+        libDel(rec.id);
+        ok('ลบความรู้แล้วหายทั้งในเครื่องและในคลังกลาง',
+          !libAll().some(x=>x.id===rec.id) && !BANK.get('lib','lib_'+rec.id));
+      } finally { LIB.items = _items; libSave(); }
+    })();
+    ok('ความรู้ที่ดึงกลับจากชีตถูกแปลงกลับได้',
+      (function(){ const r = normRec({key:'lib_x', kind:'lib', title:'ก',
+        payload: JSON.stringify({id:'x', kind:'blueprint', scope:{}, data:{groups:[]}}), ts:Date.now()});
+        return !!r && r.data.kind === 'blueprint'; })());
+    ok('แถวคลังความรู้ที่เนื้อหาเสียถูกทิ้ง',
+      normRec({key:'lib_y', kind:'lib', title:'ข', payload:'{"ไม่มีkind":1}', ts:Date.now()}) === null);
+    ok('คลังกลางมีตัวกรองคลังความรู้',
+      Array.from(d.getElementById('rKind').options).some(o=>o.value==='lib'));
+    ok('ตัวนับรวมนับคลังความรู้ด้วย',
+      BANK.countAll() === BANK.count('doc')+BANK.count('exam')+BANK.count('item')+BANK.count('book')+BANK.count('lib'));
 
     /* ══ 10. ส่งขึ้นชีตทั้งกระบวนการ (ใช้ตัวส่งจำลอง ไม่แตะเน็ตจริง) ══ */
     const realPost = BANK.post;
