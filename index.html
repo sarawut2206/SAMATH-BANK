@@ -695,8 +695,13 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                 </div>
 
                 <div class="fld" id="eScopeWrap">
-                  <label for="eScope">ขอบเขตเนื้อหา</label>
-                  <select id="eScope" onchange="eOnScope()"></select>
+                  <label>เนื้อหาที่จะออกข้อสอบ (ติ๊กได้หลายบท)</label>
+                  <div class="pickbox" id="eScopePick"></div>
+                  <div class="pkbar">
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="eScopeAll(true)">เลือกทุกบท</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick="eScopeAll(false)">ล้างที่เลือก</button>
+                    <span class="pkcount" id="eScopeCount"></span>
+                  </div>
                   <div class="hint">เลือก “ทั้งระดับชั้น” เพื่อออกข้อสอบครอบทุกบท (เหมาะกับปลายภาค / O-NET)</div>
                 </div>
 
@@ -6070,15 +6075,21 @@ function dOnTopic(){
   dOnSub();
 }
 /* กล่องติ๊กหัวข้อย่อย — ใช้ร่วมกันทั้งหน้าเอกสารและหน้าข้อสอบ */
-function paintPick(hostId, subs, cb, withCustom){
+function paintPick(hostId, subs, cb, withCustom, opt){
   const host = document.getElementById(hostId); if(!host) return;
   if(!subs.length){
-    host.innerHTML = '<div class="pk" style="color:var(--muted)">บทนี้ไม่มีรายการหัวข้อย่อยแยกไว้</div>';
+    host.innerHTML = '<div class="pk" style="color:var(--muted)">'
+      + esc((opt && opt.emptyText) || 'บทนี้ไม่มีรายการหัวข้อย่อยแยกไว้') + '</div>';
     return;
   }
+  const allTxt = (opt && opt.allText) || 'ทุกหัวข้อย่อยในบทนี้';
   host.innerHTML =
-    `<label class="pk pk-all"><input type="checkbox" data-pkall="1" onchange="pickAllToggle('${hostId}', this.checked); ${cb}"><span>ทุกหัวข้อย่อยในบทนี้</span></label>`
-    + subs.map((s,i)=>`<label class="pk"><input type="checkbox" data-pk="${i}" value="${esc(s)}" onchange="${cb}"><span>${esc(s)}</span></label>`).join('')
+    `<label class="pk pk-all"><input type="checkbox" data-pkall="1" onchange="pickAllToggle('${hostId}', this.checked); ${cb}"><span>${esc(allTxt)}</span></label>`
+    + subs.map((s,i)=>{
+        const v = (s && typeof s === 'object') ? s.v : s;
+        const t = (s && typeof s === 'object') ? s.t : s;
+        return `<label class="pk"><input type="checkbox" data-pk="${i}" value="${esc(v)}" onchange="${cb}"><span>${esc(t)}</span></label>`;
+      }).join('')
     + (withCustom ? `<label class="pk pk-cus"><input type="checkbox" data-pkcus="1" onchange="${cb}"><span>ระบุหัวข้อเอง</span></label>` : '');
 }
 function pickBoxes(hostId){
@@ -6559,29 +6570,48 @@ function eOnGrade(){
   document.getElementById('eTierWrap').style.display = isEnt(t.id) ? '' : 'none';
   document.getElementById('eGrade').disabled = isEnt(t.id);
   if(isEnt(t.id)){
-    /* สอบเข้า: ขอบเขตกวาดหลายชั้น ให้เลือกได้ทั้งสนามสอบ หรือเจาะบทเดียวจากชั้นต้นทาง */
+    /* สอบเข้า: เนื้อหากวาดหลายชั้น ให้ติ๊กบทจากชั้นต้นทางได้ทุกชั้น */
     const e = entOf(t.id);
     document.getElementById('eFormat').value = e.fmt;
     /* ชั้นที่แสดงคือชั้นที่จะเข้าเรียน ส่วนเนื้อหามาจากชั้นต้นทางที่กำหนดไว้ในสนามสอบ */
     const sel = document.getElementById('eGrade');
     if(Array.from(sel.options).some(o=>o.value===e.target)) sel.value = e.target;
-    const list = ['ทุกชั้นที่ออกสอบ (' + entGrades(t.id).map(x=>x.g).join(' · ') + ')'];
-    entGrades(t.id).forEach(x => topicsOf(x.g).forEach(tp => list.push(tp.topic)));
-    fillSel('eScope', list);
+    const list = [];
+    entGrades(t.id).forEach(x => topicsOf(x.g).forEach(tp => list.push({v:tp.topic, t:x.g + ' · ' + tp.topic})));
+    paintPick('eScopePick', list, 'eOnScope()', false,
+      {allText:'ทุกบทของทุกชั้นที่ออกสอบ (' + entGrades(t.id).map(x=>x.g).join(' · ') + ')'});
   } else {
-    fillSel('eScope', (t.scope==='grade' ? ['ทั้งระดับชั้น (ทุกบท)'] : []).concat(opts));
+    paintPick('eScopePick', opts.map(x=>({v:x, t:x})), 'eOnScope()', false,
+      {allText:'ทุกบทของชั้น ' + g});
   }
   eOnScope();
 }
+function eScopeAll(on){
+  const host = document.getElementById('eScopePick');
+  const all = host && host.querySelector('input[data-pkall]');
+  if(all) all.checked = on;
+  pickAllToggle('eScopePick', on);
+  eOnScope();
+}
 function eOnScope(){
+  pickSyncAll('eScopePick');
   const g = document.getElementById('eGrade').value;
-  const v = document.getElementById('eScope').value;
+  const picked = pickedSubs('eScopePick');
+  const cnt = document.getElementById('eScopeCount');
+  const total = pickBoxes('eScopePick').length;
+  if(cnt) cnt.textContent = picked.length
+    ? ('เลือกไว้ ' + picked.length + ' บท')
+    : (total ? 'ยังไม่ได้เลือก = ออกครอบทุกบท' : '');
+  /* เลือกบทเดียวเท่านั้นจึงเจาะหัวข้อย่อยได้ */
   const wrap = document.getElementById('eSubWrap');
-  if(v.indexOf('ทั้งระดับชั้น')===0 || v.indexOf('ทุกชั้นที่ออกสอบ')===0){ wrap.style.display='none'; }
-  else {
-    wrap.style.display='';
-    const t = findTopic(g, v) || findTopicAnyGrade(v);
+  if(picked.length === 1){
+    wrap.style.display = '';
+    const t = findTopic(g, picked[0]) || findTopicAnyGrade(picked[0]);
     paintPick('eSubPick', t ? t.subs.slice() : [], 'eOnSub()', false);
+  } else {
+    wrap.style.display = 'none';
+    const host = document.getElementById('eSubPick');
+    if(host) host.innerHTML = '';
   }
   eOnSub();
 }
@@ -6602,9 +6632,10 @@ function eOnSub(){
 function examParams(){
   const t = curExamType();
   const g = document.getElementById('eGrade').value;
-  const scope = document.getElementById('eScope').value;
-  const whole = scope.indexOf('ทั้งระดับชั้น')===0 || scope.indexOf('ทุกชั้นที่ออกสอบ')===0;
-  const subs = whole ? [] : pickedSubs('eSubPick');
+  const topics = pickedSubs('eScopePick');
+  const whole = topics.length === 0;
+  const scope = topics.join(' · ');
+  const subs = (topics.length === 1) ? pickedSubs('eSubPick') : [];
   const sub = subs.join(' · ');
   let e = +document.getElementById('eEasy').value||0,
       m = +document.getElementById('eMed').value||0,
@@ -6613,7 +6644,7 @@ function examParams(){
   const ent = entOf(t.id);
   return {
     etype:t.id, lane:eLane, grade: ent ? ent.target : g, whole:whole,
-    topic: whole?'':scope, sub:sub, subs:subs,
+    topic: whole?'':scope, topics:topics, sub:sub, subs:subs,
     tier: (document.getElementById('eTier')||{}).value || '',
     count:+document.getElementById('eCount').value||20,
     mix:{ 'ง่าย':e/sum, 'ปานกลาง':m/sum, 'ยาก':h/sum },
@@ -6677,17 +6708,19 @@ function planBuckets(p){
         list.forEach(t => topics.push({t:t, g:x.g, gw:x.pct/subsIn}));
       });
     } else {
-      for(const x of gs){
-        const t = findTopic(x.g, p.topic);
-        if(t){ topics.push({t:t, g:x.g, gw:1}); break; }
-      }
-      if(!topics.length){
-        const t = findTopicAnyGrade(p.topic);
-        if(t){
-          const og = GRADES.find(gg => findTopic(gg, p.topic));
-          topics.push({t:t, g:og || g, gw:1});
+      /* ครูติ๊กบทไว้เอง — หาบทนั้นในชั้นต้นทางที่ถูกต้อง */
+      (p.topics && p.topics.length ? p.topics : [p.topic]).forEach(name=>{
+        let hit = null;
+        for(const x of gs){
+          const t = findTopic(x.g, name);
+          if(t){ hit = {t:t, g:x.g, gw:1}; break; }
         }
-      }
+        if(!hit){
+          const t = findTopicAnyGrade(name);
+          if(t) hit = {t:t, g: GRADES.find(gg=>findTopic(gg, name)) || g, gw:1};
+        }
+        if(hit) topics.push(hit);
+      });
     }
   } else if(p.whole){
     let list = topicsOf(g).slice();
@@ -6695,8 +6728,10 @@ function planBuckets(p){
     if(p.etype==='mid') list = list.slice(0, Math.max(1, Math.ceil(list.length/2)));
     topics = list.map(t => ({t:t, g:g, gw:1}));
   } else {
-    const t = findTopic(g, p.topic);
-    topics = (t ? [t] : topicsOf(g).slice(0,1)).map(x => ({t:x, g:g, gw:1}));
+    /* ติ๊กได้หลายบท — ถ้าไม่ระบุเลยให้ถอยไปใช้บทแรกของชั้น */
+    const names = (p.topics && p.topics.length) ? p.topics : (p.topic ? [p.topic] : []);
+    const list = names.map(n=>findTopic(g, n)).filter(Boolean);
+    topics = (list.length ? list : topicsOf(g).slice(0,1)).map(x => ({t:x, g:g, gw:1}));
   }
   if(!topics.length) return [];
 
@@ -6770,12 +6805,112 @@ const FIG_KINDS = {
 const FIG_MAX_STEP = 9;      /* วาดเกินนี้จะเล็กจนดูไม่รู้เรื่อง */
 const FIG_MAX_N    = 6;      /* จำนวนรูปในแถวเดียว */
 
+/* ── รูปนิ่ง: ไม่ใช่แบบรูปที่ไล่ลำดับ แต่เป็นรูปประกอบโจทย์หนึ่งรูป ── */
+const FIG_STATIC = {
+  pie:    {name:'แผนภูมิรูปวงกลมแสดงร้อยละหรือจำนวน'},
+  circle: {name:'วงกลมพร้อมรัศมีหรือเส้นผ่านศูนย์กลางที่มีตัวเลขกำกับ'},
+  ring:   {name:'วงกลมสองวงซ้อนศูนย์กลางเดียวกัน แรเงาส่วนที่เป็นวงแหวน'}
+};
+const PIE_COLORS = ['#ffe14d','#ff5fb0','#3ddc6b','#ffb020','#5cd7ef','#a78bfa','#f87171','#94d82d'];
+
+function isStaticFig(f){ return !!(f && FIG_STATIC[f.kind]); }
 function figValid(f){
   if(!f || typeof f !== 'object') return false;
+  if(isStaticFig(f)) return staticFigValid(f);
   if(!FIG_KINDS[f.kind]) return false;
   if(!Array.isArray(f.steps) || f.steps.length < 2 || f.steps.length > FIG_MAX_N) return false;
   return f.steps.every(s => Number.isInteger(s) && s >= 1 && s <= FIG_MAX_STEP);
 }
+function staticFigValid(f){
+  if(f.kind === 'pie'){
+    if(!Array.isArray(f.parts) || f.parts.length < 2 || f.parts.length > 8) return false;
+    if(!f.parts.every(x => x && typeof x.label === 'string' && x.label.trim()
+        && isFinite(+x.value) && +x.value > 0)) return false;
+    /* ถ้าเป็นร้อยละต้องรวมได้ 100 พอดี ไม่งั้นรูปกับโจทย์จะขัดกัน */
+    if(f.unit === '%'){
+      const s = f.parts.reduce((a,x)=>a + (+x.value), 0);
+      if(Math.abs(s - 100) > 0.5) return false;
+    }
+    return true;
+  }
+  if(f.kind === 'circle'){
+    return isFinite(+f.value) && +f.value > 0 &&
+           ['radius','diameter'].indexOf(f.show || 'radius') >= 0;
+  }
+  if(f.kind === 'ring'){
+    return isFinite(+f.inner) && isFinite(+f.outer) && +f.inner > 0 && +f.outer > +f.inner;
+  }
+  return false;
+}
+
+/* ── ตัววาดของรูปนิ่ง ── */
+function pieSVG(f){
+  const R = 118, cx = 170, cy = 140;
+  const parts = f.parts.map(x=>({label:String(x.label).trim(), value:+x.value}));
+  const tot = parts.reduce((a,x)=>a+x.value, 0) || 1;
+  let ang = -Math.PI/2, body = '';       /* เริ่มที่ 12 นาฬิกา วนตามเข็ม */
+  parts.forEach((s,i)=>{
+    const sweep = s.value/tot * Math.PI*2;
+    const a2 = ang + sweep;
+    const big = sweep > Math.PI ? 1 : 0;
+    const x1 = cx + R*Math.cos(ang),  y1 = cy + R*Math.sin(ang);
+    const x2 = cx + R*Math.cos(a2),   y2 = cy + R*Math.sin(a2);
+    const col = PIE_COLORS[i % PIE_COLORS.length];
+    body += parts.length === 1
+      ? `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${col}" stroke="#222" stroke-width="1.6"/>`
+      : `<path d="M${cx} ${cy} L${x1.toFixed(1)} ${y1.toFixed(1)} A${R} ${R} 0 ${big} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" `
+        + `fill="${col}" stroke="#222" stroke-width="1.6"/>`;
+    /* ป้ายกำกับ: ชิ้นใหญ่วางในรูป ชิ้นเล็กดึงออกมานอกรูป */
+    const mid = ang + sweep/2;
+    const inner = sweep >= 0.55;
+    const rr = inner ? R*0.62 : R + 34;
+    const tx = cx + rr*Math.cos(mid), ty = cy + rr*Math.sin(mid);
+    const val = (f.unit === '%') ? (s.value + '%') : (s.value + (f.unit ? ' ' + f.unit : ''));
+    if(!inner){
+      const px = cx + (R+4)*Math.cos(mid), py = cy + (R+4)*Math.sin(mid);
+      body += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(cx+(R+22)*Math.cos(mid)).toFixed(1)}" `
+            + `y2="${(cy+(R+22)*Math.sin(mid)).toFixed(1)}" stroke="#555" stroke-width="1"/>`;
+    }
+    const anchor = inner ? 'middle' : (Math.cos(mid) < -0.2 ? 'end' : (Math.cos(mid) > 0.2 ? 'start' : 'middle'));
+    body += `<text class="pl" x="${tx.toFixed(1)}" y="${(ty-3).toFixed(1)}" text-anchor="${anchor}">${esc(s.label)}</text>`
+          + `<text class="pv" x="${tx.toFixed(1)}" y="${(ty+13).toFixed(1)}" text-anchor="${anchor}">${esc(val)}</text>`;
+    ang = a2;
+  });
+  const title = f.title ? `<text class="pt" x="${cx}" y="16" text-anchor="middle">${esc(f.title)}</text>` : '';
+  return {w:340, h:290, body:title + body};
+}
+function circleSVG(f){
+  const R = 96, cx = 130, cy = 118;
+  const v = +f.value, unit = f.unit || 'ซม.';
+  const show = f.show || 'radius';
+  let body = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#eaf4ff" stroke="#1f4e79" stroke-width="1.8"/>`;
+  if(show === 'diameter'){
+    body += `<line x1="${cx-R}" y1="${cy}" x2="${cx+R}" y2="${cy}" stroke="#1f4e79" stroke-width="1.6"/>`
+          + `<circle cx="${cx}" cy="${cy}" r="3" fill="#1f4e79"/>`
+          + `<text class="dl" x="${cx}" y="${cy-10}" text-anchor="middle">${esc(v + ' ' + unit)}</text>`;
+  } else {
+    body += `<line x1="${cx}" y1="${cy}" x2="${cx+R}" y2="${cy}" stroke="#1f4e79" stroke-width="1.6"/>`
+          + `<circle cx="${cx}" cy="${cy}" r="3" fill="#1f4e79"/>`
+          + `<text class="dl" x="${cx+R/2}" y="${cy-10}" text-anchor="middle">${esc(v + ' ' + unit)}</text>`;
+  }
+  if(f.label) body += `<text class="pt" x="${cx}" y="${cy+R+26}" text-anchor="middle">${esc(f.label)}</text>`;
+  return {w:2*cx, h:cy+R+ (f.label?36:14), body:body};
+}
+function ringSVG(f){
+  const RO = 100, cx = 132, cy = 122;
+  const inner = +f.inner, outer = +f.outer, unit = f.unit || 'ซม.';
+  const RI = Math.max(18, RO * inner / outer);
+  const body =
+      `<circle cx="${cx}" cy="${cy}" r="${RO}" fill="#c3d7ef" stroke="#222" stroke-width="1.8"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="${RI.toFixed(1)}" fill="#ffffff" stroke="#222" stroke-width="1.8"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="3" fill="#222"/>`
+    + `<line x1="${cx}" y1="${cy}" x2="${(cx+RI).toFixed(1)}" y2="${cy}" stroke="#222" stroke-width="1.4"/>`
+    + `<text class="dl" x="${(cx+RI/2).toFixed(1)}" y="${cy-9}" text-anchor="middle">${esc(inner + ' ' + unit)}</text>`
+    + `<line x1="${cx}" y1="${cy}" x2="${(cx+RO*0.7).toFixed(1)}" y2="${(cy+RO*0.71).toFixed(1)}" stroke="#222" stroke-width="1.4"/>`
+    + `<text class="dl" x="${(cx+RO*0.52).toFixed(1)}" y="${(cy+RO*0.56).toFixed(1)}" text-anchor="start">${esc(outer + ' ' + unit)}</text>`;
+  return {w:2*cx, h:cy+RO+14, body:body};
+}
+const FIG_STATIC_DRAW = { pie:pieSVG, circle:circleSVG, ring:ringSVG };
 
 /* ── ตัววาดของแต่ละชนิด คืน {w,h,body} โดยวาดจากมุมซ้ายบน (0,0) ── */
 const FIG_DRAW = {
@@ -6878,6 +7013,13 @@ const FIG_DRAW = {
 /* ── ประกอบเป็น SVG ทั้งแถบ พร้อมป้าย "รูปที่ k" ใต้ทุกรูป ── */
 function figSVG(f){
   if(!figValid(f)) return '';
+  if(isStaticFig(f)){
+    const d = FIG_STATIC_DRAW[f.kind](f);
+    const pad = 6;
+    return `<div class="qfig"><svg viewBox="${-pad} ${-pad} ${d.w+pad*2} ${d.h+pad*2}" `
+         + `width="${Math.min(420, Math.round(d.w+pad*2))}" role="img" aria-label="รูปประกอบโจทย์">`
+         + d.body + `</svg></div>`;
+  }
   const cap = f.caption || 'รูปที่';
   const gap = 30, labelH = 20;
   const parts = f.steps.map((s,i)=>{
@@ -6903,9 +7045,38 @@ function figSVG(f){
 
 /* ── คำสั่งบอก AI ว่าจะขอรูปประกอบได้อย่างไร ── */
 function figBlock(t){
-  const pat = /แบบรูป|ลำดับ|อนุกรม/.test(t.topic||'') || /ค\s*1\.2/.test(t.indicator||'');
-  if(!pat) return '';
-  return `
+  const topic = t.topic || '', ind = t.indicator || '';
+  const wantPie = /แผนภูมิรูปวงกลม|แผนภูมิวงกลม/.test(topic) || /สถิติ/.test(topic);
+  const wantCircle = /วงกลม/.test(topic) && !/แผนภูมิ/.test(topic);
+  let extra = '';
+  if(wantPie){
+    extra += `
+【บังคับ — โจทย์แผนภูมิรูปวงกลมต้องมีรูปแผนภูมิมาด้วย】
+ห้ามบรรยายค่าของแต่ละส่วนเป็นข้อความแล้วเรียกว่าแผนภูมิ นักเรียนต้องเห็นรูปจริง
+ใส่ฟิลด์ "fig" มาแบบนี้ แล้วโปรแกรมจะวาดแผนภูมิให้เอง
+  "fig": {"kind":"pie","title":"หัวเรื่องของแผนภูมิ","unit":"%","parts":[
+      {"label":"วันจันทร์","value":15},{"label":"วันอังคาร","value":10},
+      {"label":"วันพุธ","value":30},{"label":"วันพฤหัสบดี","value":25},{"label":"วันศุกร์","value":20}]}
+  • unit ใส่ "%" เมื่อแต่ละส่วนเป็นร้อยละ — กรณีนี้ผลรวมของ value ทุกส่วน "ต้องเท่ากับ 100 พอดี"
+  • ถ้าแผนภูมิบอกเป็นจำนวนจริง ให้ unit เป็นหน่วยนั้น เช่น "แก้ว" "ตัว" "คน" แล้ว value คือจำนวนจริง
+  • มีได้ 2–8 ส่วน ทุกส่วนต้องมีทั้ง label และ value ที่มากกว่าศูนย์
+  • ห้ามเขียนค่าของทุกส่วนซ้ำลงในคำถามอีก ให้นักเรียนอ่านจากรูป ยกเว้นค่าที่จำเป็น เช่น จำนวนรวมทั้งหมด
+  • เฉลยต้องคำนวณจากค่าที่อยู่ในรูปเป๊ะ ๆ ตรวจซ้ำก่อนส่ง`;
+  }
+  if(wantCircle){
+    extra += `
+【บังคับ — โจทย์วงกลมต้องมีรูปวงกลมพร้อมตัวเลขกำกับ】
+ใส่ฟิลด์ "fig" มาด้วยเสมอ เลือกแบบใดแบบหนึ่ง
+  • วงกลมวงเดียว: {"kind":"circle","show":"radius","value":7,"unit":"ซม."}
+      show เป็น "radius" (ลากรัศมี) หรือ "diameter" (ลากเส้นผ่านศูนย์กลาง) ตามที่โจทย์กำหนดให้
+  • วงแหวน (วงกลมซ้อนกันแล้วแรเงาส่วนที่อยู่ระหว่างสองวง):
+      {"kind":"ring","inner":3,"outer":6,"unit":"ซม."}   โดย outer ต้องมากกว่า inner เสมอ
+  • ตัวเลขในรูปต้องเป็นตัวเดียวกับที่ใช้ในโจทย์และในเฉลย ห้ามขัดกัน
+  • โจทย์เขียนว่า "จากรูป …" ได้เลย ไม่ต้องบรรยายขนาดซ้ำในโจทย์อีก`;
+  }
+  const pat = /แบบรูป|ลำดับ|อนุกรม/.test(topic) || /ค\s*1\.2/.test(ind);
+  if(!pat) return extra;
+  return extra + `
 【รูปประกอบโจทย์ — บังคับสำหรับโจทย์แบบรูปที่อ้างถึงรูปทรงหรือสิ่งของ】
 โจทย์แบบรูปในหนังสือและในข้อสอบจริง จะให้ "เห็นรูป 3–4 รูปแรก" แล้วถามรูปถัดไปเสมอ
 ห้ามบรรยายรูปเป็นข้อความยาว ๆ แทนการวางรูป ให้ใส่ฟิลด์ "fig" มาด้วย แล้วโปรแกรมจะวาดรูปให้เอง
@@ -8968,9 +9139,11 @@ function renderCurr(){
 function jumpExam(g, topic){
   go('exam'); examLane('school'); pickExamType('unit');
   document.getElementById('eGrade').value = g; eOnGrade();
-  const ts = document.getElementById('eScope');
-  const opt = [...ts.options].find(o=>o.value.indexOf(topic.slice(0,12))===0);
-  if(opt){ ts.value=opt.value; eOnScope(); }
+  /* ติ๊กเฉพาะบทที่กดมาจากหน้าหลักสูตร */
+  pickAllToggle('eScopePick', false);
+  const hit = pickBoxes('eScopePick').find(b=>b.value.indexOf(topic.slice(0,12))===0);
+  if(hit) hit.checked = true;
+  eOnScope();
 }
 
 /* ════════ SETTINGS ════════ */
@@ -9117,6 +9290,10 @@ ul,ol{margin:8px 0 8px 22px;} li{margin:3px 0;}
 .qfig .u .top{fill:#e6f2ff;} .qfig .u .side{fill:#a8cdf0;}
 .qfig .u rect{fill:#cfe6ff;stroke:#1f4e79;stroke-width:1.4;}
 .qfig .cap{font-size:12px;fill:#222;font-weight:600;}
+.qfig .pl{font-size:13px;fill:#111;font-weight:700;}
+.qfig .pv{font-size:13px;fill:#222;font-weight:600;}
+.qfig .pt{font-size:14px;fill:#111;font-weight:700;}
+.qfig .dl{font-size:13.5px;fill:#123a5c;font-weight:700;}
 .qfig .dim{font-size:11px;fill:#444;}
 .qfig .val{font-size:14px;fill:#111;font-weight:700;}
 
@@ -9594,7 +9771,7 @@ ok('ตัวนับเงินเริ่มต้นครบทุกช�
 
   /* ══ 8. การเชื่อมหน้าจอ ══ */
   const _lane = eLane, _type = eType, _grade = d.getElementById('eGrade').value,
-        _fmt = d.getElementById('eFormat').value, _scope = d.getElementById('eScope').value;
+        _fmt = d.getElementById('eFormat').value, _scope = pickedSubs('eScopePick');
   try{
 fillSel('eGrade', GRADES);   /* ปกติ boot() เติมให้ แต่ในเทสต์เรียกเอง */
 function pick(grade, etype){
@@ -9630,8 +9807,8 @@ ENT_IDS.forEach(id => {
   ok('[' + id + '] รายการห้องเรียนถูกเติมครบ',
     d.getElementById('eTier').options.length === e.tiers.length);
   ok('[' + id + '] ขอบเขตเนื้อหามีตัวเลือกรวมทุกชั้น + บทของทุกชั้นต้นทาง',
-    d.getElementById('eScope').options.length ===
-      1 + entGrades(id).reduce((a,x)=>a+topicsOf(x.g).length, 0));
+    pickBoxes('eScopePick').length ===
+      entGrades(id).reduce((a,x)=>a+topicsOf(x.g).length, 0));
   e.tiers.forEach(t => {
     d.getElementById('eTier').value = t.id; eOnTier();
     ok('[' + id + '/' + t.id + '] เลือกห้องแล้วสัดส่วนความยากเปลี่ยนตาม',
@@ -9671,7 +9848,7 @@ ok('ข้อสอบในโรงเรียนไม่ถูกใส่�
 
 /* ── กล่องติ๊กหัวข้อย่อย ── */
 examLane('school'); d.getElementById('eGrade').value = 'ม.1'; pickExamType('unit');
-d.getElementById('eScope').selectedIndex = 0; eOnScope();
+pickAllToggle('eScopePick', false); pickBoxes('eScopePick')[0].checked = true; eOnScope();
 const nBox = pickBoxes('eSubPick').length;
 ok('กล่องติ๊กหัวข้อย่อยของข้อสอบถูกสร้างตามบทที่เลือก', nBox > 0, 'ได้ ' + nBox);
 ok('ยังไม่ติ๊ก = ไม่มีหัวข้อย่อยเจาะจง', pickedSubs('eSubPick').length === 0 && examParams().sub === '');
@@ -9727,7 +9904,7 @@ ok('ไม่มีระดับความยากก็ไม่พัง�
 CFG.showLevel = _showLv;
 ok('ทุกข้อที่วางแผนไว้มีระดับความยากติดมาด้วย',
   planBuckets(examParams()).every(s => ['ง่าย','ปานกลาง','ยาก'].indexOf(s.level) >= 0));
-ok('เลือกชั้น ป.6 แล้วรายการบทไม่ว่าง', d.getElementById('eScope').options.length > 1);
+ok('เลือกชั้น ป.6 แล้วรายการบทไม่ว่าง', pickBoxes('eScopePick').length > 1);
 ok('ทุกชั้นเปลี่ยนได้โดยไม่ error', GRADES.every(g=>{ try{ pick(g,'onet'); return true; }catch(e){ return false; } }));
   } catch(err){ ok('เทสต์หน้าจอทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally{
@@ -9735,7 +9912,8 @@ ok('ทุกชั้นเปลี่ยนได้โดยไม่ error'
     try{
       examLane(_lane); d.getElementById('eGrade').value = _grade; pickExamType(_type);
       d.getElementById('eFormat').value = _fmt;
-      if(_scope) d.getElementById('eScope').value = _scope;
+      if(_scope && _scope.length){ pickAllToggle('eScopePick', false);
+        pickBoxes('eScopePick').forEach(b=>{ if(_scope.indexOf(b.value)>=0) b.checked = true; }); eOnScope(); }
       eOnScope();
     }catch(e){}
   }
@@ -9920,6 +10098,121 @@ ok('แยกชื่อกับเลขที่จากรายชื่�
       BANK.all('doc').concat(BANK.all('exam')).every(r => !r.students && !r.results));
   } catch(err){ ok('เทสต์วิเคราะห์นักเรียนทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally{ STU.cur = _cur; STU.rooms = _rooms; }
+})();
+
+
+/* ══ 14. รูปประกอบแบบนิ่ง: แผนภูมิวงกลม วงกลม วงแหวน ══ */
+ok('มีชนิดรูปนิ่งครบสามแบบ',
+  Object.keys(FIG_STATIC).length === 3 && ['pie','circle','ring'].every(k=>!!FIG_STATIC[k]));
+const PIE_OK = { kind:'pie', title:'ยอดขาย', unit:'%', parts:[
+  {label:'วันจันทร์', value:15},{label:'วันอังคาร', value:10},{label:'วันพุธ', value:30},
+  {label:'วันพฤหัสบดี', value:25},{label:'วันศุกร์', value:20}] };
+ok('แผนภูมิวงกลมที่ร้อยละรวมได้ 100 ผ่าน', figValid(PIE_OK));
+ok('แผนภูมิวงกลมที่ร้อยละรวมไม่ถึง 100 ถูกปฏิเสธ (กันรูปขัดกับโจทย์)',
+  figValid({kind:'pie', unit:'%', parts:[{label:'ก',value:60},{label:'ข',value:30}]}) === false);
+ok('แผนภูมิแบบจำนวนจริงไม่ต้องรวมได้ 100',
+  figValid({kind:'pie', unit:'แก้ว', parts:[{label:'โกโก้',value:36},{label:'เผือก',value:27}]}));
+ok('แผนภูมิที่มีส่วนเดียวหรือเกินแปดส่วนถูกปฏิเสธ',
+  figValid({kind:'pie', parts:[{label:'ก',value:1}]}) === false &&
+  figValid({kind:'pie', parts:new Array(9).fill(0).map((x,i)=>({label:'ก'+i, value:1}))}) === false);
+ok('แผนภูมิที่ค่าเป็นศูนย์หรือติดลบถูกปฏิเสธ',
+  figValid({kind:'pie', parts:[{label:'ก',value:0},{label:'ข',value:100}]}) === false);
+ok('แผนภูมิที่ไม่มีป้ายชื่อถูกปฏิเสธ',
+  figValid({kind:'pie', parts:[{label:'',value:50},{label:'ข',value:50}]}) === false);
+(function(){
+  const svg = figSVG(PIE_OK);
+  ok('วาดแผนภูมิวงกลมได้ครบทุกส่วน', (svg.match(/<path/g)||[]).length === PIE_OK.parts.length);
+  ok('แผนภูมิมีชื่อส่วนและตัวเลขกำกับครบ',
+    PIE_OK.parts.every(x => svg.indexOf(x.label) >= 0 && svg.indexOf(x.value + '%') >= 0));
+  ok('แผนภูมิมีหัวเรื่อง', svg.indexOf('ยอดขาย') >= 0);
+  ok('แต่ละส่วนใช้สีต่างกัน',
+    new Set((svg.match(/fill="#[0-9a-f]{6}"/g)||[])).size >= PIE_OK.parts.length);
+})();
+ok('วงกลมต้องมีขนาดที่มากกว่าศูนย์',
+  figValid({kind:'circle', value:7, unit:'ซม.'}) &&
+  figValid({kind:'circle', value:0}) === false);
+ok('วงกลมระบุได้ทั้งรัศมีและเส้นผ่านศูนย์กลาง',
+  figValid({kind:'circle', show:'diameter', value:12}) &&
+  figValid({kind:'circle', show:'มั่ว', value:12}) === false);
+(function(){
+  const s = figSVG({kind:'circle', show:'diameter', value:12, unit:'ซม.'});
+  ok('รูปวงกลมมีตัวเลขกำกับตรงกับที่โจทย์ให้', s.indexOf('12 ซม.') >= 0);
+  ok('รูปวงกลมมีจุดศูนย์กลางและเส้นที่ลากให้เห็น',
+    (s.match(/<circle/g)||[]).length >= 2 && s.indexOf('<line') >= 0);
+})();
+ok('วงแหวนต้องมีวงนอกใหญ่กว่าวงใน',
+  figValid({kind:'ring', inner:3, outer:6}) &&
+  figValid({kind:'ring', inner:6, outer:3}) === false &&
+  figValid({kind:'ring', inner:6, outer:6}) === false);
+(function(){
+  const s = figSVG({kind:'ring', inner:3, outer:6, unit:'ซม.'});
+  ok('วงแหวนมีตัวเลขกำกับทั้งวงในและวงนอก',
+    s.indexOf('3 ซม.') >= 0 && s.indexOf('6 ซม.') >= 0);
+  ok('วงแหวนแรเงาส่วนระหว่างสองวง', (s.match(/<circle/g)||[]).length >= 2);
+})();
+ok('รูปนิ่งไม่ต้องมี steps และไม่ถูกใส่ป้าย "รูปที่"',
+  figSVG(PIE_OK).indexOf('รูปที่') < 0);
+ok('สเปกรูปที่ผิดรูปแบบไม่ถูกวาด',
+  figSVG({kind:'pie'}) === '' && figSVG({kind:'ไม่มีชนิดนี้'}) === '' && figSVG(null) === '');
+(function(){
+  const tPie = findTopic('ป.6', 'สถิติ — แผนภูมิรูปวงกลม ป.6');
+  const bPie = figBlock(tPie);
+  ok('บทแผนภูมิวงกลมสั่งให้ส่งรูปแผนภูมิมาด้วย', bPie.indexOf('"kind":"pie"') >= 0);
+  ok('บทแผนภูมิวงกลมย้ำว่าร้อยละต้องรวมได้ 100', bPie.indexOf('เท่ากับ 100 พอดี') >= 0);
+  ok('บทแผนภูมิวงกลมห้ามบรรยายค่าแทนการวางรูป', bPie.indexOf('ห้ามบรรยายค่าของแต่ละส่วน') >= 0);
+  const tCir = findTopic('ป.6', 'การวัด — ปริมาตร พื้นที่รูปหลายเหลี่ยมและวงกลม ป.6');
+  const bCir = figBlock(tCir);
+  ok('บทวงกลมสั่งให้ส่งรูปวงกลมพร้อมตัวเลขกำกับ',
+    bCir.indexOf('"kind":"circle"') >= 0 && bCir.indexOf('"kind":"ring"') >= 0);
+  ok('บทวงกลมย้ำว่าตัวเลขในรูปต้องตรงกับโจทย์', bCir.indexOf('ห้ามขัดกัน') >= 0);
+  ok('บทที่ไม่เกี่ยวกับรูปไม่ถูกยัดคำสั่งรูป',
+    figBlock(findTopic('ป.6','ห.ร.ม. และ ค.ร.น.')) === '');
+  ok('บทแบบรูปยังได้คำสั่งแบบรูปเหมือนเดิม',
+    figBlock(findTopic('ป.6','แบบรูป ป.6')).indexOf('steps') >= 0);
+})();
+
+/* ══ 15. เลือกเนื้อหาได้หลายบท ══ */
+(function(){
+  const _lane = eLane, _type = eType;
+  try{
+    examLane('school'); d.getElementById('eGrade').value = 'ม.1'; pickExamType('unit');
+    const boxes = pickBoxes('eScopePick');
+    ok('มีปุ่มติ๊กเลือกบทครบตามหลักสูตรของชั้น', boxes.length === CURRICULUM['ม.1'].length, boxes.length + '');
+    ok('มีปุ่มเลือกทุกบทและปุ่มล้าง', !!d.querySelector('#eScopePick input[data-pkall]'));
+    pickAllToggle('eScopePick', false); eOnScope();
+    ok('ไม่ติ๊กเลย = ออกครอบทุกบทของชั้น', examParams().whole === true);
+    boxes[0].checked = true; boxes[2].checked = true; eOnScope();
+    const pp = examParams();
+    ok('ติ๊กสองบทแล้วใบสั่งงานเก็บครบสองบท', pp.topics.length === 2 && pp.whole === false);
+    ok('ชื่อบทถูกต่อไว้ให้อ่านออกในหัวข้อสอบ', pp.topic.indexOf(' · ') > 0);
+    const sl = planBuckets(pp);
+    ok('ข้อถูกกระจายไปทั้งสองบทที่ติ๊ก',
+      new Set(sl.map(s=>s.topic)).size === 2, new Set(sl.map(s=>s.topic)).size + '');
+    ok('จำนวนข้อรวมยังตรงกับที่สั่ง', sl.length === pp.count);
+    ok('ติ๊กหลายบทแล้วซ่อนช่องหัวข้อย่อย (เจาะได้เมื่อเลือกบทเดียว)',
+      d.getElementById('eSubWrap').style.display === 'none');
+    pickAllToggle('eScopePick', false); boxes[1].checked = true; eOnScope();
+    ok('เลือกบทเดียวแล้วเปิดให้เจาะหัวข้อย่อยได้',
+      d.getElementById('eSubWrap').style.display !== 'none' && pickBoxes('eSubPick').length > 0);
+    ok('เลือกคนละบทได้กุญแจคลังคนละอัน',
+      examKeyOf(examParams()) !== examKeyOf(pp));
+    eScopeAll(true);
+    ok('ปุ่มเลือกทุกบททำงาน', pickedSubs('eScopePick').length === boxes.length);
+    /* สอบเข้า: บทมาจากหลายชั้น ติ๊กข้ามชั้นได้ */
+    examLane('entrance'); pickExamType('ent_m1');
+    const eb = pickBoxes('eScopePick');
+    pickAllToggle('eScopePick', false);
+    const p4 = eb.find(b=>!!findTopic('ป.4', b.value));
+    const p6 = eb.find(b=>!!findTopic('ป.6', b.value));
+    p4.checked = true; p6.checked = true; eOnScope();
+    const se = planBuckets(examParams());
+    ok('สอบเข้าติ๊กบทข้ามชั้นได้ และแต่ละข้อผูกกับชั้นต้นทางที่ถูก',
+      new Set(se.map(s=>s.grade)).size === 2 &&
+      se.every(s => !!findTopic(s.grade, s.topic)),
+      [...new Set(se.map(s=>s.grade))].join(','));
+    pickAllToggle('eScopePick', false); eOnScope();
+  } catch(err){ ok('เทสต์เลือกหลายบททำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally{ try{ examLane(_lane); pickExamType(_type); }catch(e){} }
 })();
 
   /* ══ 9ก. ชนิดข้อมูลใหม่ต้องเดินทางถึงคลังกลางได้ ══ */
