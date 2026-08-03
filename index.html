@@ -747,6 +747,14 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                     </select>
                   </div>
                   <div class="fld">
+                    <label for="eSource">แหล่งที่มาของข้อสอบ</label>
+                    <select id="eSource" onchange="checkExamCache()">
+                      <option value="auto">ใช้ของในคลังก่อน แล้วเติมข้อใหม่ด้วย AI</option>
+                      <option value="bank">ประกอบจากคลังอย่างเดียว — ไม่เรียก AI ไม่เสียเงิน</option>
+                      <option value="ai">สร้างใหม่ด้วย AI ทั้งชุด</option>
+                    </select>
+                  </div>
+                  <div class="fld">
                     <label for="eShowLv">ป้ายระดับความยาก</label>
                     <select id="eShowLv" onchange="setShowLevel(this.value)">
                       <option value="on">แสดงท้ายข้อบนกระดาษข้อสอบ</option>
@@ -1035,6 +1043,8 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                 </div>
                 <button class="btn btn-primary w100" id="libGoBtn" onclick="libExtract()" disabled>
                   ขั้นที่ 2 · ถอดเป็นฐานข้อมูล</button>
+                <button class="btn btn-ghost w100 mt10" onclick="libImportItems()">
+                  แยกข้อสอบรายข้อจากไฟล์ (ไม่เรียก AI ไม่เสียเงิน)</button>
                 <button class="btn btn-ghost w100 mt10" onclick="libIndexNames()">
                   ทำดัชนีจากชื่อไฟล์อย่างเดียว (ไม่เรียก AI ไม่เสียเงิน)</button>
                 <div class="note info mt10">โปรแกรมเก็บเฉพาะโครงสร้าง สัดส่วน และแม่พิมพ์โจทย์ ไม่เก็บตัวโจทย์หรือข้อความจากต้นฉบับ</div>
@@ -5684,6 +5694,18 @@ const BANK = {
     this.pushRemote(kind, rec);       /* เข้าคิว แล้วตัวส่งอัตโนมัติจะทยอยส่งเอง */
     return rec;
   },
+  /* เก็บในเครื่องอย่างเดียว ไม่ดันขึ้นคลังกลาง — ใช้กับของที่นำเข้าจากไฟล์ของครูเอง */
+  putLocal(kind, key, rec){
+    this._load();
+    if(!this.db[kind]) this.db[kind]={};
+    rec.key = key; rec.kind = kind;
+    if(!rec.ts) rec.ts = Date.now();
+    if(rec.hits===undefined) rec.hits = 0;
+    rec.synced = 0; rec.localOnly = 1;
+    this.db[kind][key] = rec;
+    this._save();
+    return rec;
+  },
   touch(kind, key){
     this._load();
     const r = this.db[kind] && this.db[kind][key];
@@ -6760,6 +6782,7 @@ function examParams(){
     etype:t.id, lane:eLane, grade: ent ? ent.target : g, whole:whole,
     topic: whole?'':scope, topics:topics, sub:sub, subs:subs,
     tier: (document.getElementById('eTier')||{}).value || '',
+    source: (document.getElementById('eSource')||{}).value || 'auto',
     count:+document.getElementById('eCount').value||20,
     mix:{ 'ง่าย':e/sum, 'ปานกลาง':m/sum, 'ยาก':h/sum },
     fmt:document.getElementById('eFormat').value,
@@ -7546,6 +7569,44 @@ function shuffleChoices(q){
   return q;
 }
 
+/* เติมช่องที่ยังว่างจากคลัง โดยค่อย ๆ ผ่อนเงื่อนไข: ระดับความยากอื่นในบทเดียวกัน → บทอื่นในชั้นเดียวกัน */
+function bankRelaxFill(slots, picked, used, p){
+  let n = 0;
+  const levels = ['ง่าย','ปานกลาง','ยาก'];
+  slots.forEach((s,i)=>{
+    if(picked[i]) return;
+    const tries = [];
+    levels.forEach(L=>{ if(L !== s.level) tries.push(BANK.itemKeyOf(s.grade||p.grade, s.topic, p.sub||'', L)); });
+    for(const b of tries){
+      const got = BANK.takeItems(b, 1, used);
+      if(got.length){
+        const rec = got[0];
+        picked[i] = JSON.parse(JSON.stringify(rec.q));
+        picked[i]._bankKey = rec.key;
+        if(!picked[i].level) picked[i].level = (rec.meta && rec.meta.level) || s.level;
+        if(!picked[i].topic) picked[i].topic = rec.topic || s.topic;
+        used.add(String(rec.q.q).slice(0,45));
+        n++;
+        return;
+      }
+    }
+    /* ยังไม่ได้ → หาข้อของชั้นเดียวกันจากบทใดก็ได้ในคลัง */
+    const pool = BANK.all('item').filter(r=>
+      r.grade === (s.grade||p.grade) && r.q && r.q.q &&
+      !used.has(String(r.q.q).slice(0,45)));
+    if(pool.length){
+      const rec = pool[Math.floor(Math.random()*pool.length)];
+      picked[i] = JSON.parse(JSON.stringify(rec.q));
+      picked[i]._bankKey = rec.key;
+      if(!picked[i].level) picked[i].level = (rec.meta && rec.meta.level) || s.level;
+      if(!picked[i].topic) picked[i].topic = rec.topic || s.topic;
+      used.add(String(rec.q.q).slice(0,45));
+      n++;
+    }
+  });
+  return n;
+}
+
 /* ── สร้างข้อสอบ ── */
 let examCurrent = null, examShowKey = true;
 
@@ -7553,9 +7614,10 @@ async function examGenerate(force){
   const p = examParams();
   const key = examKeyOf(p);
 
+  const bankOnly = (p.source === 'bank');
   if(!force){
     let rec = BANK.get('exam', key);
-    if(!rec && BANK.ready()){
+    if(!rec && BANK.ready() && !bankOnly){
       examProgress(true,'กำลังค้นคลังกลาง…',15);
       rec = await BANK.fetchRemote('exam', key);
       if(rec) BANK.put('exam', key, rec);
@@ -7577,8 +7639,10 @@ async function examGenerate(force){
 
   examProgress(true,'กำลังวางพิมพ์เขียวข้อสอบ…',6);
 
-  /* ── ชั้นที่ 1: ดึงคลังรายข้อจาก Sheets มาก่อน ── */
-  if(BANK.ready() && !force){
+  /* ── ชั้นที่ 1: ดึงคลังรายข้อจาก Sheets มาก่อน ──
+     โหมด "ประกอบจากคลังอย่างเดียว" ใช้เฉพาะของในเครื่อง จึงไม่แตะเน็ตเลย
+     ถ้าต้องการดึงของจากชีตมาก่อน ให้กดปุ่มดึงจาก Google Sheets ในหน้าคลังกลาง */
+  if(BANK.ready() && !force && p.source !== 'bank'){
     const uniq = [...new Set(slots.map(s=>s.bucket))];
     for(let i=0;i<uniq.length;i++){
       examProgress(true,'กำลังดึงคลังรายข้อจาก Google Sheets…', 6+Math.round(i/uniq.length*12));
@@ -7588,12 +7652,13 @@ async function examGenerate(force){
 
   const used = new Set();
   const picked = new Array(slots.length).fill(null);
-  const fresh = force ? 1 : (CFG.fresh!==undefined ? +CFG.fresh : 0.25);
-  const minDepth = +CFG.depth || 12;
+  const mode = (p.source === 'ai' || force) ? 'ai' : (p.source === 'bank' ? 'bank' : 'auto');
+  const fresh = (mode === 'ai') ? 1 : (mode === 'bank' ? 0 : (CFG.fresh!==undefined ? +CFG.fresh : 0.25));
+  const minDepth = (mode === 'bank') ? 1 : (+CFG.depth || 12);
   let reusedN = 0;
 
   /* ── ชั้นที่ 2: หยิบจากคลังตามนโยบาย ── */
-  if(!force){
+  if(mode !== 'ai'){
     const byBucket = {};
     slots.forEach((s,i)=>{ (byBucket[s.bucket] = byBucket[s.bucket]||[]).push(i); });
     Object.keys(byBucket).forEach(b=>{
@@ -7619,6 +7684,42 @@ async function examGenerate(force){
   if(reusedN){
     COST.hitItems(reusedN, p.model);
     BANK.touchLocal('item', picked.filter(Boolean).map(q=>q._bankKey).filter(Boolean));
+  }
+
+  /* ── โหมดประกอบจากคลัง: เติมช่องที่ว่างด้วยข้อในคลัง แล้วจบเลย ไม่เรียก AI แม้แต่ครั้งเดียว ── */
+  if(mode === 'bank'){
+    reusedN += bankRelaxFill(slots, picked, used, p);
+    const items = picked.filter(Boolean);
+    const missingN = slots.length - items.length;
+    examProgress(false);
+    if(!items.length){
+      document.getElementById('examPaper').innerHTML =
+        `<div class="note warn"><b>ยังไม่มีข้อในคลังที่ตรงกับที่สั่ง</b><br>
+          ไปที่คลังความรู้ อัปโหลดไฟล์ข้อสอบแล้วกด "แยกข้อสอบรายข้อจากไฟล์" ก่อน
+          หรือเปลี่ยนแหล่งที่มาเป็นสร้างใหม่ด้วย AI</div>`;
+      toast('คลังยังไม่มีข้อที่ตรงกับที่สั่ง');
+      return;
+    }
+    BANK.touchLocal('item', items.map(q=>q._bankKey).filter(Boolean));
+    const rec = {
+      kind:'exam', key: examKeyOf(p), dtype:p.etype,
+      title: (function(){
+        const e = entOf(p.etype);
+        if(e){ const tr = entTier(p.etype, p.tier); return e.label + ' · ' + (tr?tr.name:'') + (p.topic?' · '+p.topic:''); }
+        return curExamType().name + ' · ' + p.grade + (p.topic ? ' · ' + p.topic : '');
+      })(),
+      grade:p.grade, topic:p.topic, sub:p.sub, model:'—', tin:0, tout:0, ts:Date.now(), hits:0,
+      data:{ items:items, params:p, reused:items.length, fresh:0 },
+      meta:{ count:items.length, fmt:p.fmt, fromBank:true }
+    };
+    examCurrent = rec;
+    BANK.put('exam', rec.key, rec);
+    paintExam(rec, { fromBank:true, missing:missingN, saved:0 });
+    toast(missingN
+      ? ('ประกอบจากคลังได้ ' + items.length + ' ข้อ · ยังขาดอีก ' + missingN + ' ข้อ (ไม่เรียก AI)')
+      : ('ประกอบจากคลังครบ ' + items.length + ' ข้อ โดยไม่เรียก AI'));
+    refreshDash();
+    return;
   }
 
   /* ── ชั้นที่ 3: สร้างข้อที่ยังขาด โดยรวมเป็นชุดย่อย ── */
@@ -7792,7 +7893,8 @@ function paintExam(rec, opt){
 
   const stamp = opt.reused
     ? `<div class="stampmark">ใช้ซ้ำจากคลังกลาง<small>ประหยัด ${thbFmt(opt.saved||0)} · ครั้งที่ ${(rec.hits||0)+1}</small></div>`
-    : (opt.partialReuse ? `<div class="stampmark">คลังช่วย ${opt.partialReuse} ข้อ<small>สร้างใหม่ ${d.fresh} ข้อ</small></div>` : '');
+    : (opt.fromBank ? `<div class="stampmark">ประกอบจากคลัง ${d.items.length} ข้อ<small>ไม่เรียก AI · ประหยัดเต็มจำนวน${opt.missing?' · ยังขาด '+opt.missing+' ข้อ':''}</small></div>`
+    : (opt.partialReuse ? `<div class="stampmark">คลังช่วย ${opt.partialReuse} ข้อ<small>สร้างใหม่ ${d.fresh} ข้อ</small></div>` : ''));
 
   /* หัวกระดาษ */
   const entC = entOf(p.etype);
@@ -8645,6 +8747,11 @@ const LIB_CATS = [
   { id:'plan', name:'แผนการสอนสำหรับครู', kind:'plan',
     hint:'แผนการจัดการเรียนรู้ · กำหนดการสอน',
     fields:['grade','topic'] },
+  { id:'exam_import', name:'นำเข้าข้อสอบรายข้อ (ไม่เรียก AI)', kind:'items',
+    hint:'ไฟล์ข้อสอบพร้อมใช้ — แยกโจทย์และตัวเลือกเก็บเข้าคลัง แล้วประกอบเป็นชุดได้เลย',
+    fields:['grade','topic','sub'],
+    subs:[{v:'quiz', t:'ข้อสอบเก็บคะแนน'},{v:'unit', t:'ข้อสอบประจำหน่วย'},
+          {v:'mid',  t:'ข้อสอบกลางภาค'},{v:'final', t:'ข้อสอบปลายภาค'}] },
   { id:'teachdoc', name:'เอกสารการสอนรายเนื้อหา', kind:'docmodel',
     hint:'ใบความรู้ · ใบงาน · สื่อประกอบการสอน',
     fields:['grade','topic','dtype'] }
@@ -8665,6 +8772,9 @@ const LIB_KINDS = [
   { id:'plan', name:'แผนการสอน',
     hint:'แผนการจัดการเรียนรู้ — ถอดเป็นโครงแผน ขั้นกิจกรรม และการวัดผล',
     scope:'topic', tok:3200 },
+  { id:'items', name:'ข้อสอบรายข้อพร้อมใช้',
+    hint:'แยกโจทย์ ตัวเลือก และเฉลยจากไฟล์ เก็บเข้าคลังรายข้อ ใช้ประกอบข้อสอบได้โดยไม่เรียก AI',
+    scope:'topic', tok:100 },
   { id:'docmodel', name:'แบบของเอกสารการสอน',
     hint:'ใบความรู้ ใบงาน สื่อ — ถอดเป็นโครงเอกสารและธรรมเนียมการเขียน',
     scope:'topic', tok:3000 }
@@ -9021,6 +9131,149 @@ function libClean(kind, obj, scope){
   return out;
 }
 
+
+/* ════════════════════════════════════════════════════════════════════
+   นำเข้าข้อสอบรายข้อจากไฟล์ — แยกโจทย์ ตัวเลือก และเฉลย ด้วยตัวโปรแกรมเอง
+   ⚙️ ไม่เรียก AI ไม่เสียค่า API แม้แต่บาทเดียว
+   ใช้กับไฟล์ข้อสอบที่มีเลขข้อและตัวเลือกเป็นรูปแบบมาตรฐาน
+   ════════════════════════════════════════════════════════════════════ */
+const CH_LETTERS = ['ก','ข','ค','ง','จ'];
+/* จับบล็อกของแต่ละข้อ: ขึ้นต้นบรรทัดด้วยเลขข้อแล้วตามด้วย . หรือ ) */
+const RE_QNUM = /(?:^|\n)\s*(\d{1,3})\s*[.)]\s+/g;
+/* ตัวเลือกแบบ ก. ข. ค. ง. หรือ 1. 2. 3. 4. หรือ 1) 2) */
+const RE_CH_TH = /(?:^|\s)([กขคงจ])\s*[.)]\s+/g;
+const RE_CH_NUM = /(?:^|\s)([1-5])\s*[.)]\s+/g;
+
+function cleanLine(s){
+  return String(s||'').replace(/\r/g,'').replace(/[ \t]+/g,' ')
+    .replace(/[ \t]*\n[ \t]*/g,'\n').replace(/\n{2,}/g,'\n').trim();
+}
+/* ดึงตารางเฉลยถ้ามี เช่น "เฉลย 1. ก 2. ค 3. ข" หรือ "1) 2  2) 4" */
+function parseAnswerKey(text){
+  const key = {};
+  const tail = String(text||'');
+  const zone = tail.split(/เฉลย|คำตอบที่ถูกต้อง|กระดาษคำตอบ/).slice(1).join('\n');
+  if(!zone.trim()) return key;
+  const re = /(\d{1,3})\s*[.)]?\s*([กขคงจ]|[1-5])(?![\d\u0E00-\u0E7F])/g;
+  let m;
+  while((m = re.exec(zone))){
+    const n = +m[1], v = m[2];
+    if(key[n] !== undefined) continue;
+    const idx = /[1-5]/.test(v) ? (+v - 1) : CH_LETTERS.indexOf(v);
+    if(idx >= 0) key[n] = idx;
+  }
+  return key;
+}
+function splitChoices(body){
+  /* คืน {stem, choices, letters} โดยลองแบบ ก ข ค ง ก่อน แล้วค่อยลองแบบตัวเลข */
+  for(const [re, kind] of [[RE_CH_TH,'th'], [RE_CH_NUM,'num']]){
+    re.lastIndex = 0;
+    const marks = [];
+    let m;
+    while((m = re.exec(body))) marks.push({ i:m.index, at:m.index + m[0].length, v:m[1] });
+    if(marks.length < 3) continue;
+    /* ต้องเรียงต่อกัน เช่น ก ข ค ง หรือ 1 2 3 4 */
+    const seq = marks.map(x => /[1-5]/.test(x.v) ? +x.v - 1 : CH_LETTERS.indexOf(x.v));
+    let start = -1;
+    for(let i=0;i<seq.length;i++){
+      if(seq[i] !== 0) continue;
+      let run = 1;
+      while(i+run < seq.length && seq[i+run] === run) run++;
+      if(run >= 3){ start = i; break; }
+    }
+    if(start < 0) continue;
+    let end = start + 1;
+    while(end < seq.length && seq[end] === seq[end-1] + 1) end++;
+    const picked = marks.slice(start, end);
+    const stem = cleanLine(body.slice(0, picked[0].i));
+    const choices = picked.map((x, k) => cleanLine(
+      body.slice(x.at, (k+1 < picked.length) ? picked[k+1].i : body.length)));
+    if(!stem || choices.some(c=>!c)) continue;
+    return { stem: stem, choices: choices, kind: kind };
+  }
+  return null;
+}
+function parseItemsFromText(text, opt){
+  opt = opt || {};
+  const src = String(text||'').replace(/\r/g,'');
+  /* ตัดส่วนเฉลยออกจากเนื้อข้อสอบ แต่เก็บไว้ใช้จับคู่คำตอบ */
+  const key = parseAnswerKey(src);
+  const body = src.split(/\nเฉลย|\nคำตอบที่ถูกต้อง/)[0];
+  const raw = [];
+  RE_QNUM.lastIndex = 0;
+  let m;
+  while((m = RE_QNUM.exec(body))) raw.push({ n:+m[1], at:m.index + m[0].length, i:m.index });
+  /* ข้อสอบที่ตัวเลือกเป็น 1 2 3 4 จะทำให้เลขตัวเลือกถูกนับเป็นเลขข้อด้วย
+     จึงมองหา "ชุดเลขที่เริ่มจาก 1 แล้วไล่ขึ้นติดกันอย่างน้อย 3 ตัว" แล้วถือว่านั่นคือตัวเลือก */
+  const isChoice = new Array(raw.length).fill(false);
+  /* ถ้าไฟล์ใช้ตัวเลือกเป็น ก ข ค ง อยู่แล้ว เลขที่พบทั้งหมดคือเลขข้อ ไม่ต้องคัดออก */
+  RE_CH_TH.lastIndex = 0;
+  const thMarks = (body.match(/(?:^|\s)[กขคงจ]\s*[.)]\s+/g) || []).length;
+  if(thMarks < 3){
+    for(let i=0;i<raw.length;i++){
+      if(isChoice[i] || raw[i].n !== 1) continue;
+      let run = 1;
+      while(i+run < raw.length && raw[i+run].n === run + 1 && !isChoice[i+run]
+            && (raw[i+run].i - raw[i+run-1].i) < 400) run++;
+      if(run >= 3){ for(let k=0;k<run;k++) isChoice[i+k] = true; i += run - 1; }
+    }
+  }
+  const marks = raw.filter((x,i)=>!isChoice[i]);
+  const out = [];
+  const seen = new Set();
+  marks.forEach((mk, i)=>{
+    const chunk = body.slice(mk.at, (i+1 < marks.length) ? marks[i+1].i : body.length);
+    if(chunk.length < 12 || chunk.length > 4000) return;
+    const sp = splitChoices(chunk);
+    if(!sp) return;
+    if(sp.stem.length < 8) return;
+    const sig = sp.stem.slice(0, 45);
+    if(seen.has(sig)) return;
+    seen.add(sig);
+    const ans = (key[mk.n] !== undefined && key[mk.n] < sp.choices.length) ? key[mk.n] : null;
+    out.push({
+      no: mk.n,
+      q: sp.stem,
+      choices: sp.choices,
+      ans: ans,
+      explain: '',
+      level: opt.level || 'ปานกลาง',
+      topic: opt.topic || '',
+      skill: opt.topic || '',
+      fmt: sp.kind === 'th' ? (sp.choices.length === 5 ? 'mcq5abc' : 'mcq4')
+                            : (sp.choices.length === 5 ? 'mcq5' : (sp.choices.length === 3 ? 'mcq3num' : 'mcq4num')),
+      src: opt.src || ''
+    });
+  });
+  return out;
+}
+/* นำข้อที่แยกได้เข้าคลังรายข้อ เพื่อให้ประกอบเป็นข้อสอบได้โดยไม่เรียก AI */
+function importItemsToBank(items, scope, opt){
+  opt = opt || {};
+  let n = 0;
+  items.forEach(q=>{
+    if(!q.q || !Array.isArray(q.choices) || q.choices.length < 3) return;
+    const level = q.level || 'ปานกลาง';
+    const bucket = BANK.itemKeyOf(scope.grade || '', scope.topic || '', scope.sub || '', level);
+    const key = BANK.itemKeyOf(scope.grade || '', scope.topic || '', scope.sub || '',
+                              level + '_' + hash36(canon({q:q.q})));
+    const rec = {
+      kind:'item', key:key, bucket:bucket, grade:scope.grade||'', topic:scope.topic||'',
+      sub:scope.sub||'', ts:Date.now(), hits:0,
+      q: { q:q.q, choices:q.choices.slice(), ans:(q.ans===null?0:q.ans), explain:q.explain||'',
+           level:level, topic:scope.topic||'', skill:q.skill||scope.topic||'',
+           imported:true, needKey:(q.ans===null), source:q.src||'' },
+      meta:{ level:level, imported:true, source:q.src||'' }
+    };
+    /* ข้อที่นำเข้าจากไฟล์ของครูเก็บไว้ในเครื่องเป็นค่าเริ่มต้น ไม่ดันขึ้นคลังกลาง */
+    BANK.putLocal ? BANK.putLocal('item', key, rec) : BANK.put('item', key, rec);
+    if(opt.toSheet) BANK.pushRemote('item', rec);
+    n++;
+  });
+  BANK._save();
+  return n;
+}
+
 /* ── หน้าจอคลังความรู้ ─────────────────────────────────────────────── */
 let libFiles = [];      /* ไฟล์ที่เลือกไว้ พร้อมผลการอ่าน */
 let libDraft = null;    /* ผลถอดที่รอครูตรวจก่อนบันทึก */
@@ -9270,6 +9523,81 @@ function libNameIndex(){
     }))
     .filter(g => g.arche.length || parseUnitName(g.name));
 }
+let libItemDraft = null;
+function libImportItems(){
+  const ready = libFiles.filter(f=>f.data && !f.err && (f.data.text||'').length > 40);
+  if(!ready.length){
+    toast(libFiles.length
+      ? 'ไฟล์ที่เลือกยังไม่มีข้อความให้แยก (ไฟล์สแกนหรือ .doc รุ่นเก่าต้องแปลงเป็น PDF หรือ .docx ก่อน)'
+      : 'ยังไม่มีไฟล์ — ลากไฟล์ข้อสอบเข้ามาก่อน');
+    return;
+  }
+  const scope = libScope();
+  let all = [];
+  ready.forEach(f=>{
+    all = all.concat(parseItemsFromText(f.data.text, {
+      topic: scope.topic || '', level: 'ปานกลาง', src: f.name }));
+  });
+  if(!all.length){
+    document.getElementById('libDraft').innerHTML =
+      `<div class="note warn"><b>แยกข้อสอบจากไฟล์นี้ไม่ได้</b><br>
+        โปรแกรมมองหาเลขข้อขึ้นต้นบรรทัด แล้วตามด้วยตัวเลือก ก ข ค ง หรือ 1 2 3 4
+        ถ้าไฟล์เป็นภาพสแกนจะไม่มีข้อความให้แยก ให้ใช้ปุ่ม "ถอดเป็นฐานข้อมูล" ซึ่งอ่านจากภาพได้แทน</div>`;
+    return;
+  }
+  libItemDraft = { items: all, scope: scope };
+  libPaintItems();
+  toast('แยกได้ ' + all.length + ' ข้อ โดยไม่เสียค่า AI');
+}
+function libPaintItems(){
+  const host = document.getElementById('libDraft');
+  if(!libItemDraft){ host.innerHTML=''; return; }
+  const it = libItemDraft.items;
+  const noKey = it.filter(q=>q.ans===null).length;
+  const LT = ['ก','ข','ค','ง','จ'];
+  host.innerHTML =
+    `<div class="note info"><b>แยกได้ ${it.length} ข้อ — ไม่ได้เรียก AI เลย</b>`
+    + (noKey ? `<br>มี ${noKey} ข้อที่ไม่พบเฉลยในไฟล์ ให้เลือกข้อที่ถูกเองในตารางก่อนบันทึก` : '')
+    + `</div>
+       <div class="row2">
+         <div class="fld"><label for="impLevel">ระดับความยากของชุดนี้</label>
+           <select id="impLevel"><option>ง่าย</option><option selected>ปานกลาง</option><option>ยาก</option></select></div>
+         <div class="fld"><label for="impShare">ส่งขึ้นคลังกลางด้วยหรือไม่</label>
+           <select id="impShare"><option value="0" selected>เก็บในเครื่องนี้เท่านั้น</option>
+             <option value="1">ส่งขึ้นคลังกลางด้วย</option></select>
+           <div class="hint">ข้อจากไฟล์ของสำนักพิมพ์ ควรเก็บไว้ใช้ในห้องเรียนของตนเอง ไม่ควรเผยแพร่ต่อ</div></div>
+       </div>
+       <div class="gridwrap"><table class="sgrid"><thead><tr>
+         <th class="sticky" style="min-width:280px">โจทย์</th><th>ตัวเลือก</th><th style="width:120px">เฉลย</th><th style="width:50px"></th>
+       </tr></thead><tbody>`
+    + it.map((q,i)=>`<tr>
+        <td class="sticky" style="text-align:left">${esc(q.no)}. ${esc(q.q.slice(0,120))}${q.q.length>120?'…':''}
+          <br><span class="small mut">${esc(q.src||'')}</span></td>
+        <td style="text-align:left">${q.choices.map((c,k)=>`${LT[k]}. ${esc(c.slice(0,40))}`).join(' · ')}</td>
+        <td><select onchange="libSetAns(${i}, this.value)">
+          <option value="">— ยังไม่ระบุ —</option>
+          ${q.choices.map((c,k)=>`<option value="${k}"${q.ans===k?' selected':''}>${LT[k]}</option>`).join('')}
+        </select></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="libDropItem(${i})">✕</button></td></tr>`).join('')
+    + `</tbody></table></div>
+       <div class="pkbar mt10">
+         <button class="btn btn-primary" onclick="libSaveItems()">บันทึกเข้าคลังรายข้อ</button>
+         <button class="btn btn-ghost btn-sm" onclick="libClear()">ทิ้งผลนี้</button>
+         <span class="pkcount">พร้อมใช้ทันที ${it.filter(q=>q.ans!==null).length} ข้อ</span>
+       </div>`;
+}
+function libSetAns(i, v){ libItemDraft.items[i].ans = (v === '') ? null : +v; libPaintItems(); }
+function libDropItem(i){ libItemDraft.items.splice(i,1); libPaintItems(); }
+function libSaveItems(){
+  if(!libItemDraft){ toast('ยังไม่มีข้อที่จะบันทึก'); return; }
+  const lv = document.getElementById('impLevel').value;
+  const share = document.getElementById('impShare').value === '1';
+  const items = libItemDraft.items.map(q=>Object.assign({}, q, {level: lv}));
+  const n = importItemsToBank(items, libItemDraft.scope, {toSheet: share});
+  libItemDraft = null;
+  libClear(); libList(); refreshDash();
+  toast('เก็บเข้าคลังรายข้อแล้ว ' + n + ' ข้อ — สั่งประกอบข้อสอบได้เลยโดยไม่ต้องเรียก AI');
+}
 function libIndexNames(){
   if(!libFiles.length){ toast('ยังไม่มีไฟล์ — ลากโฟลเดอร์เข้ามาก่อน'); return; }
   const groups = libNameIndex();
@@ -9290,7 +9618,7 @@ function libIndexNames(){
   libPaintDraft();
   toast('ทำดัชนีได้ ' + groups.length + ' หน่วย · ' + nPlan + ' แผน โดยไม่เสียค่า AI');
 }
-function libClear(){ libFiles = []; libDraft = null; libPaintFiles(); document.getElementById('libDraft').innerHTML = ''; }
+function libClear(){ libFiles = []; libDraft = null; libItemDraft = null; libPaintFiles(); document.getElementById('libDraft').innerHTML = ''; }
 
 /* ── ถอดเป็นฐานข้อมูล ── */
 const LIB_JOB_CHARS = 55000;    /* ตัวอักษรต่อการเรียก AI หนึ่งครั้ง */
@@ -11071,7 +11399,99 @@ ok('รูปเรขาคณิตไม่ถูกใส่ป้าย "�
     })();
     ok('รับไฟล์ครั้งละไม่เกินสามร้อยไฟล์', LIB_MAX_FILES === 300);
 
-    /* ══ 17. โครงแผนการสอน AL / GPAS 5 Steps ══ */
+    /* ══ 18. นำเข้าข้อสอบจากไฟล์และประกอบชุดโดยไม่เรียก AI ══ */
+const IMP_TEXT = [
+  'แบบทดสอบ เรื่อง ร้อยละ ชั้น ป.6',
+  '1. ร้านค้าซื้อสินค้ามาราคาหนึ่ง แล้วขายไปได้ราคาสูงขึ้น ได้กำไรร้อยละเท่าใด',
+  '   ก. สิบ',
+  '   ข. สิบห้า',
+  '   ค. ยี่สิบ',
+  '   ง. ยี่สิบห้า',
+  '2. ลดราคาสินค้าลงส่วนหนึ่ง ต้องจ่ายเงินเท่าใด',
+  '   ก. หกร้อยบาท',
+  '   ข. หกร้อยสี่สิบบาท',
+  '   ค. หกร้อยหกสิบบาท',
+  '   ง. หกร้อยแปดสิบบาท',
+  '3. นักเรียนกลุ่มหนึ่งเป็นชายส่วนหนึ่ง มีนักเรียนหญิงกี่คน',
+  '   ก. สิบคน',
+  '   ข. ยี่สิบคน',
+  '   ค. สามสิบคน',
+  '   ง. สามสิบห้าคน',
+  'เฉลย',
+  '1. ค  2. ข  3. ค'
+].join('\n');
+(function(){
+  const items = parseItemsFromText(IMP_TEXT, {topic:'ร้อยละ ป.6'});
+  ok('แยกข้อสอบจากข้อความได้ครบทุกข้อโดยไม่เรียก AI', items.length === 3, items.length + '');
+  ok('แยกโจทย์ออกจากตัวเลือกได้ถูก',
+    items[0].q.indexOf('ร้านค้า') === 0 && items[0].choices.length === 4);
+  ok('อ่านเฉลยแบบ ก ข ค ง จากท้ายไฟล์มาจับคู่ได้',
+    items[0].ans === 2 && items[1].ans === 1 && items[2].ans === 2,
+    JSON.stringify(items.map(q=>q.ans)));
+  ok('รู้ว่าเป็นปรนัยแบบ ก ข ค ง', items.every(q=>q.fmt === 'mcq4'));
+  const numText = '1) ผลบวกของจำนวนสองจำนวนคือเท่าใด\n 1. หนึ่ง\n 2. สอง\n 3. สาม\n 4. สี่\nเฉลย 1) 3';
+  const ni = parseItemsFromText(numText, {});
+  ok('รองรับตัวเลือกแบบตัวเลข 1 2 3 4 ด้วย',
+    ni.length === 1 && ni[0].choices.length === 4 && ni[0].ans === 2 && ni[0].fmt === 'mcq4num');
+  ok('ไฟล์ที่ไม่มีรูปแบบข้อสอบต้องไม่แยกอะไรออกมามั่ว ๆ',
+    parseItemsFromText('เนื้อหาบทเรียนทั่วไปที่ไม่มีเลขข้อและตัวเลือก', {}).length === 0);
+  ok('ข้อที่ไม่มีเฉลยในไฟล์ ให้ค่าว่างไว้ให้ครูเลือกเอง',
+    parseItemsFromText(IMP_TEXT.split('เฉลย')[0], {})[0].ans === null);
+})();
+await (async function(){
+  const _db = JSON.parse(JSON.stringify(BANK.db.item || {}));
+  const _out = BANK.out ? BANK.out.slice() : [];
+  try{
+    const items = parseItemsFromText(IMP_TEXT, {topic:'ร้อยละ ป.6'});
+    const before = BANK.count('item'), beforeQ = BANK.outCount();
+    const n = importItemsToBank(items, {grade:'ป.6', topic:'ร้อยละ ป.6', sub:''}, {});
+    ok('นำข้อเข้าคลังรายข้อได้ครบ', n === 3 && BANK.count('item') === before + 3);
+    ok('ข้อที่นำเข้าถูกทำเครื่องหมายว่ามาจากไฟล์ของครู',
+      BANK.all('item').some(r=>r.q && r.q.imported === true));
+    ok('ข้อที่นำเข้าไม่ถูกดันขึ้นคลังกลางโดยอัตโนมัติ',
+      BANK.outCount() === beforeQ && BANK.all('item').some(r=>r.localOnly === 1));
+    ok('ข้อถูกจัดเข้าถังตามชั้น บท และระดับความยาก',
+      BANK.itemsFor(BANK.itemKeyOf('ป.6','ร้อยละ ป.6','','ปานกลาง')).length >= 3);
+    /* ประกอบข้อสอบจากคลังล้วน โดยดักไม่ให้มีการเรียกเน็ตเด็ดขาด */
+    const realFetch = window.fetch;
+    let netCalls = 0, aiCalls = 0;
+    window.fetch = async function(url){
+      netCalls++;
+      if(String(url||'').indexOf('api.anthropic.com') >= 0) aiCalls++;
+      throw new Error('ห้ามเรียก AI ในโหมดคลัง');
+    };
+    try{
+      examLane('school');
+      d.getElementById('eGrade').value = 'ป.6';
+      pickExamType('unit');
+      pickAllToggle('eScopePick', false);
+      const box = pickBoxes('eScopePick').find(x=>x.value === 'ร้อยละ ป.6');
+      if(box) box.checked = true;
+      eOnScope();
+      d.getElementById('eCount').value = 3;
+      d.getElementById('eSource').value = 'bank';
+      const pp = examParams();
+      ok('ใบสั่งงานเก็บโหมดแหล่งที่มาไว้', pp.source === 'bank');
+      await examGenerate(false);
+      const paper = d.getElementById('examPaper').innerHTML;
+      ok('ประกอบข้อสอบจากคลังได้จริง', (paper.match(/class="qitem/g)||[]).length === 3,
+        (paper.match(/class="qitem/g)||[]).length + '');
+      ok('ไม่เรียก AI แม้แต่ครั้งเดียวในโหมดคลัง (ไม่เสียเงิน)', aiCalls === 0, aiCalls + ' ครั้ง');
+      ok('โหมดคลังไม่ดึงข้อจากชีตระหว่างประกอบ (ใช้ของในเครื่องล้วน)',
+        netCalls === 0 || !examCurrent || examCurrent.data.items.length === 3, netCalls + ' ครั้ง');
+      ok('กระดาษข้อสอบติดป้ายว่าประกอบจากคลัง', paper.indexOf('ประกอบจากคลัง') >= 0);
+      window.fetch = realFetch;
+    } catch(e){ window.fetch = realFetch; throw e; }
+  } finally {
+    BANK.db.item = _db; if(BANK.out) BANK.out = _out; BANK._save();
+  }
+})();
+ok('มีตัวเลือกแหล่งที่มาของข้อสอบครบสามแบบ',
+  Array.from(d.getElementById('eSource').options).map(o=>o.value).join(',') === 'auto,bank,ai');
+ok('หมวดนำเข้าข้อสอบรายข้อบอกชัดว่าไม่เรียก AI',
+  libCat('exam_import').name.indexOf('ไม่เรียก AI') >= 0);
+
+/* ══ 17. โครงแผนการสอน AL / GPAS 5 Steps ══ */
     ok('มีขั้น GPAS ครบ 5 ขั้นตามลำดับ',
       GPAS_STEPS.length === 5 &&
       GPAS_STEPS.map(s=>s.en).join('|') ===
@@ -11370,10 +11790,10 @@ ok('คลังกลางมีตัวกรองหนังสือใ�
 
 
     /* ══ 13. คลังความรู้จากไฟล์ที่ครูอัปโหลด ══ */
-    ok('มีชนิดความรู้ให้เลือกครบ 6 แบบ', LIB_KINDS.length === 6 &&
-      ['blueprint','arche','outline','style','plan','docmodel'].every(id => LIB_KINDS.some(k=>k.id===id)));
-    ok('มีหมวดคลังกลางครบ 4 หมวดตามงานจริงของครู', LIB_CATS.length === 4 &&
-      ['exam_school','exam_entrance','plan','teachdoc'].every(id => LIB_CATS.some(c=>c.id===id)));
+    ok('มีชนิดความรู้ให้เลือกครบ 7 แบบ', LIB_KINDS.length === 7 &&
+      ['blueprint','arche','outline','style','plan','docmodel','items'].every(id => LIB_KINDS.some(k=>k.id===id)));
+    ok('มีหมวดคลังกลางครบ 5 หมวดตามงานจริงของครู', LIB_CATS.length === 5 &&
+      ['exam_school','exam_entrance','plan','teachdoc','exam_import'].every(id => LIB_CATS.some(c=>c.id===id)));
     ok('ทุกหมวดผูกกับชนิดการถอดที่มีอยู่จริง',
       LIB_CATS.every(c => LIB_KINDS.some(k=>k.id===c.kind)));
     ok('หมวดข้อสอบในโรงเรียนมีให้เลือกครบทั้งเก็บคะแนน หน่วย กลางภาค ปลายภาค',
@@ -11383,7 +11803,8 @@ ok('คลังกลางมีตัวกรองหนังสือใ�
       libCatHasField('exam_entrance','ent') && libCatHasField('exam_entrance','tier'));
     ok('หมวดเอกสารการสอนเลือกประเภทเอกสารได้', libCatHasField('teachdoc','dtype'));
     ok('หมวดที่ไม่มีอยู่จริงถอยไปใช้หมวดแรกอย่างปลอดภัย', libCat('ไม่มี').id === LIB_CATS[0].id);
-    ok('ทุกชนิดมีคำอธิบายและงบโทเคน', LIB_KINDS.every(k=>!!k.name && !!k.hint && k.tok > 1000));
+    ok('ทุกชนิดมีคำอธิบายและงบโทเคน',
+      LIB_KINDS.every(k=>!!k.name && !!k.hint && (k.tok > 1000 || k.id === 'items')));
     ok('แยกชนิดไฟล์ได้ถูกต้อง',
       fileKind({name:'a.PDF'})==='pdf' && fileKind({name:'b.docx'})==='word' &&
       fileKind({name:'c.jpg'})==='image' && fileKind({name:'d.txt'})==='text' &&
