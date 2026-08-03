@@ -449,7 +449,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
         <div class="rail-glyph"><svg class="scmark" viewBox="0 0 64 64" width="100%" height="100%" aria-label="SAMATH Craft AI"><defs><linearGradient id="scB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient><linearGradient id="scP" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><path d="M42 6H20L6 22h22z" fill="url(#scB)"/><path d="M28 22H6l14 14h22z" fill="url(#scB)" opacity=".82"/><path d="M22 58h22l14-16H36z" fill="url(#scP)"/><path d="M36 42h22L44 28H22z" fill="url(#scP)" opacity=".82"/><path d="M52 8l2.6 5.4L60 16l-5.4 2.6L52 24l-2.6-5.4L44 16l5.4-2.6z" fill="#22d3ee"/></svg></div>
         <div>
           <div class="rail-name">SAMATH <span class="rail-craft">Craft AI</span></div>
-          <div class="rail-ver">v10 · ป.1–ม.6</div>
+          <div class="rail-ver">v10 · ป.1–ม.6<br><span id="railBuild"></span></div>
         </div>
       </div>
     </div>
@@ -5663,12 +5663,16 @@ const MODELS = [
 const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 
 /* ── CONFIG ─────────────────────────────────────────────────────── */
+/* ตราประทับรุ่นของไฟล์ ใช้ดูว่ากำลังเปิดไฟล์ตัวไหนอยู่ เวลามีหลายไฟล์ในเครื่อง */
+const BUILD = '2026-08-03';
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
   key:'', pass:'samath2569', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
   teacher:'', school:'', term:'', books:{}, layout:'compact', showLevel:true, zoom:100
 };
 let CFG = Object.assign({}, CFG_DEF);
+/* ไฟล์ที่ฝังที่อยู่คลังกลางมาให้ = ตัวใช้ในเครื่องตัวเอง ส่วนตัวที่ไม่ฝัง = ตัวแจกจ่าย */
+function edition(){ return CFG_DEF.url ? 'ใช้ในเครื่องตัวเอง' : 'ตัวแจกจ่าย'; }
 
 function loadCfg(){
   try{ CFG = Object.assign({}, CFG_DEF, JSON.parse(localStorage.getItem(CFG_KEY)||'{}')); }
@@ -5865,7 +5869,14 @@ const BANK = {
         signal: ctl ? ctl.signal : undefined
       });
       const txt = await res.text();
-      if(!res.ok) return {ok:false, error:'HTTP '+res.status+(txt?' · '+txt.slice(0,120):'')};
+      if(!res.ok){
+        /* เจอบ่อยที่สุด: อ่าน (GET) ได้ แต่เขียน (POST) ไม่ได้ เพราะเวอร์ชันที่เผยแพร่อยู่
+           ยังเป็นโค้ดเก่าที่ไม่มีฟังก์ชัน doPost — Google จะตอบ 404 พร้อมหน้าเว็บของ Google Docs */
+        if(res.status === 404 || /Script function not found|doPost|<!DOCTYPE/i.test(txt))
+          return {ok:false, error:'เวอร์ชันที่เผยแพร่อยู่ยังเป็นโค้ดเก่า (ไม่มีฟังก์ชัน doPost) '
+            + '— ต้องไป ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ → ✏️ → เวอร์ชัน: เวอร์ชันใหม่ → เสร็จสิ้น'};
+        return {ok:false, error:'HTTP '+res.status+(txt?' · '+txt.slice(0,120):'')};
+      }
       let d;
       try{ d = JSON.parse(txt); }
       catch(e){
@@ -6131,7 +6142,28 @@ const BANK = {
     if(d.ok === false)
       return {step:'script', ok:false, cause:'สคริปต์ตอบว่ามีข้อผิดพลาด',
         fix:'ลองรัน setup แล้วตามด้วย selfTest ใน Apps Script', detail:String(d.error||'')};
-    return {step:'ok', ok:true, version: d.version || '—'};
+    /* อ่านผ่านแล้ว ยังต้องพิสูจน์ว่าเขียนได้ด้วย เพราะสองอย่างนี้พังคนละสาเหตุกัน */
+    const probe = '__probe__' + Date.now();
+    const w = await this.post({ action:'put', kind:'doc', key:probe, grade:'—', topic:'ทดสอบระบบ',
+      sub:'', title:'ทดสอบการเขียน', dtype:'probe', bucket:'', model:'', tin:0, tout:0,
+      payload:'<p>ทดสอบ</p>', meta:'{}' });
+    if(!w.ok){
+      if(/doPost|เวอร์ชันที่เผยแพร่/.test(String(w.error||'')))
+        return {step:'version', ok:false, version:d.version||'—',
+          cause:'อ่านได้ แต่เขียนไม่ได้ — เวอร์ชันที่เผยแพร่อยู่ยังเป็นโค้ดเก่า',
+          fix:'ใน Apps Script กด ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ → ✏️ (ดินสอ) '
+            + '→ ช่อง เวอร์ชัน เลือก "เวอร์ชันใหม่" → เสร็จสิ้น แล้วกลับมาทดสอบอีกครั้ง',
+          detail:String(w.error||'').slice(0,160)};
+      if(/รหัสผ่าน|password/i.test(String(w.error||'')))
+        return {step:'pass', ok:false, cause:'รหัสผ่านไม่ตรงกับที่ตั้งไว้ในสคริปต์',
+          fix:'ดูบรรทัด BANK_PASSWORD ในสคริปต์ แล้วใส่ให้ตรงกันในช่องด้านบน'};
+      return {step:'write', ok:false, version:d.version||'—',
+        cause:'อ่านได้ แต่เขียนไม่ได้',
+        fix:'ตรวจว่าตอนเผยแพร่ตั้ง "ผู้ที่มีสิทธิ์เข้าถึง" เป็น ทุกคน และรัน setup ในสคริปต์แล้ว',
+        detail:String(w.error||'').slice(0,160)};
+    }
+    this.post({ action:'del', kind:'doc', key:probe });
+    return {step:'ok', ok:true, version: d.version || '—', write:true};
   },
   async stats(){
     if(!this.ready()) return null;
@@ -10832,13 +10864,7 @@ async function testSheets(){
   }
   const s = await BANK.stats();
   if(s){
-    /* อ่านได้แล้วยังไม่พอ ต้องพิสูจน์ว่า "เขียนได้" ด้วย เพราะที่ผ่านมาการเขียนล้มเงียบ */
-    const probeKey = '__probe__' + Date.now();
-    const w = await BANK.post({ action:'put', kind:'doc', key:probeKey, grade:'—', topic:'ทดสอบระบบ',
-      sub:'', title:'ทดสอบการเขียน', dtype:'probe', bucket:'', model:'', tin:0, tout:0,
-      payload:'<p>ทดสอบการเขียนจากโปรแกรม</p>', meta:'{}', password: CFG.pass||'' });
-    if(w.ok){
-      BANK.post({ action:'del', kind:'doc', key:probeKey, password: CFG.pass||'' });
+    {
       const ver = String(s.version || dg.version || '—');
       const old = /bank-1\.[012]/.test(ver);
       box.innerHTML = `<div class="note ${old?'warn':'info'}"><b>เชื่อมต่อสำเร็จ · อ่านได้ · เขียนได้</b><br>
@@ -10846,11 +10872,6 @@ async function testSheets(){
         เวอร์ชัน Apps Script: ${esc(ver)}
         ${old ? '<br><b>โค้ดในชีตเก่ากว่าโปรแกรม</b> — หนังสือและคลังความรู้จะยังไม่ถูกเก็บขึ้นชีต '
               + 'ให้วางไฟล์ samath-bank.gs ตัวล่าสุด แล้วรัน setup อีกครั้งและทำให้ใช้งานได้เป็นเวอร์ชันใหม่' : ''}</div>`;
-    } else {
-      box.innerHTML = `<div class="note err"><b>อ่านได้ แต่เขียนไม่ได้</b><br>
-        สาเหตุ: ${esc(w.error||'')}<br>
-        มักเกิดจากตอน Deploy ตั้ง “ผู้ที่มีสิทธิ์เข้าถึง” ไม่ใช่ <b>ทุกคน</b>
-        หรือแก้สคริปต์แล้วยังไม่ได้ <b>ทำให้ใช้งานได้ใหม่</b></div>`;
     }
     refreshDash();
   } else {
@@ -11016,6 +11037,8 @@ function doEnter(){
   startApp();
 }
 function startApp(){
+  const rb = document.getElementById('railBuild');
+  if(rb) rb.textContent = 'build ' + BUILD + ' · ' + edition();
   document.getElementById('gate').style.display='none';
   document.getElementById('shell').classList.add('on');
   fillSel('rGrade', [{v:'all',t:'ทุกระดับ'}].concat(GRADES.map(g=>({v:g,t:g}))), 'all');
@@ -12222,6 +12245,13 @@ ok('มีปุ่มคืนค่าที่ฝังมาในไฟล�
   } finally { CFG.url = _url; CFG.pass = _pass; BANK._paused = _paused; storeCfg(); }
 })();
 
+
+ok('ไฟล์มีตราประทับรุ่นให้ดูว่าเปิดไฟล์ตัวไหนอยู่',
+  /^\d{4}-\d{2}-\d{2}$/.test(BUILD) && typeof edition === 'function');
+ok('แยกออกว่าเป็นตัวใช้ในเครื่องตัวเองหรือตัวแจกจ่าย',
+  edition() === (CFG_DEF.url ? 'ใช้ในเครื่องตัวเอง' : 'ตัวแจกจ่าย'));
+ok('ตราประทับรุ่นถูกแสดงบนแถบเมนู', !!d.getElementById('railBuild'));
+
 /* ══ 20. วินิจฉัยการเชื่อมต่อคลังกลาง — ต้องบอกสาเหตุจริง ไม่ใช่ให้เดาเอง ══ */
 await (async function(){
   const _url = CFG.url, _pass = CFG.pass, _fetch = window.fetch;
@@ -12265,10 +12295,37 @@ await (async function(){
     mock('{}', 404);
     const d5 = await BANK.diagnose();
     ok('HTTP 404 → บอกว่าไม่พบ deployment', d5.cause.indexOf('404') >= 0);
-    mock(JSON.stringify({ok:true, version:'bank-1.3'}));
+    /* อ่านได้ (GET ตอบ ok) แต่เขียนไม่ได้ (POST ตอบ 404 พร้อมหน้าเว็บ Google) */
+    let call = 0;
+    window.fetch = async function(url, opt){
+      call++;
+      const isPost = !!(opt && opt.method === 'POST');
+      return isPost
+        ? { ok:false, status:404, text: async()=>'<!DOCTYPE html><html lang="th"><head><meta name="description" content="เอกสารเวิร์ดโปรเซสเซอร์">' }
+        : { ok:true, status:200, text: async()=>JSON.stringify({ok:true, version:'bank-1.3'}) };
+    };
+    const dw = await BANK.diagnose();
+    ok('อ่านได้แต่เขียนไม่ได้ → ชี้ว่าเวอร์ชันที่เผยแพร่เป็นโค้ดเก่า',
+      dw.ok === false && dw.step === 'version' && dw.cause.indexOf('เขียนไม่ได้') >= 0, dw.cause);
+    ok('บอกวิธีแก้ตรงจุด คือให้กดเวอร์ชันใหม่',
+      dw.fix.indexOf('เวอร์ชันใหม่') >= 0, dw.fix);
+    ok('post บอกสาเหตุแทนที่จะโยน HTTP 404 ดิบ',
+      (await BANK.post({action:'ping'})).error.indexOf('doPost') >= 0);
+    /* เขียนไม่ได้เพราะรหัสผิด ต้องแยกออกจากกรณีเวอร์ชันเก่า */
+    window.fetch = async function(url, opt){
+      const isPost = !!(opt && opt.method === 'POST');
+      return { ok:true, status:200, text: async()=> isPost
+        ? JSON.stringify({ok:false, error:'รหัสผ่านไม่ถูกต้อง'})
+        : JSON.stringify({ok:true, version:'bank-1.3'}) };
+    };
+    const dp = await BANK.diagnose();
+    ok('เขียนไม่ได้เพราะรหัสผิด → ชี้ไปที่ BANK_PASSWORD', dp.step === 'pass', dp.cause);
+    /* ทุกอย่างปกติ ทั้งอ่านและเขียน */
+    window.fetch = async function(){ return { ok:true, status:200,
+      text: async()=>JSON.stringify({ok:true, version:'bank-1.3'}) }; };
     const d6 = await BANK.diagnose();
     ok('ทุกอย่างถูกต้อง → ผ่านและบอกเวอร์ชันของสคริปต์',
-      d6.ok === true && d6.version === 'bank-1.3');
+      d6.ok === true && d6.version === 'bank-1.3' && d6.write === true);
     ok('ทุกกรณีที่ไม่ผ่านต้องมีทั้งสาเหตุและวิธีแก้',
       [d1,d2,d3,d4,d5].every(x=>!x.ok && x.cause && x.fix));
   } catch(err){ ok('เทสต์ตัววินิจฉัยทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
