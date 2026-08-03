@@ -1276,6 +1276,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
             <div class="fx">
               <button class="btn btn-primary" onclick="saveCfg()">บันทึก</button>
               <button class="btn btn-ghost" onclick="testSheets()">ทดสอบการเชื่อมต่อ</button>
+              <button class="btn btn-ghost" onclick="resetBankCfg()">ใช้ค่าที่ฝังมาในไฟล์</button>
               <button class="btn btn-ghost" onclick="showSetupGuide()">ดูวิธีสร้าง Google Sheet</button>
             </div>
             <div id="sheetTest" class="mt18"></div>
@@ -5664,7 +5665,7 @@ const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
-  key:'', pass:'', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
+  key:'', pass:'samath2569', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
   teacher:'', school:'', term:'', books:{}, layout:'compact', showLevel:true, zoom:100
 };
 let CFG = Object.assign({}, CFG_DEF);
@@ -10802,6 +10803,21 @@ function forgetKey(){
   if(!confirm('ลบ API Key ออกจากเครื่องนี้?')) return;
   CFG.key=''; storeCfg(); fillCfgForm(); toast('ลบคีย์แล้ว');
 }
+/* ค่าที่ฝังมาในไฟล์เป็นแค่ค่าเริ่มต้น ถ้าเครื่องนี้เคยกดบันทึกไว้ ค่าที่บันทึกจะทับเสมอ
+   ปุ่มนี้ดึงค่าที่ฝังมาในไฟล์กลับมาใช้ เพื่อไม่ต้องพิมพ์เอง */
+function resetBankCfg(){
+  if(!CFG_DEF.url && !CFG_DEF.pass){
+    toast('ไฟล์นี้ไม่ได้ฝังที่อยู่คลังกลางมาให้ ต้องกรอกเอง');
+    return;
+  }
+  CFG.url = CFG_DEF.url || CFG.url;
+  CFG.pass = CFG_DEF.pass || CFG.pass;
+  BANK._paused = false;
+  storeCfg();
+  fillCfgForm();
+  toast('คืนค่าที่ฝังมาในไฟล์แล้ว — กำลังทดสอบการเชื่อมต่อ');
+  testSheets();
+}
 async function testSheets(){
   const box = document.getElementById('sheetTest');
   saveCfg();
@@ -12187,6 +12203,23 @@ await (async function(){
     ok('ยังไม่ใส่ API Key ต้องบอกให้ไปใส่ก่อน ไม่ใช่เงียบ', bbItems.length === 0);
   } catch(err){ ok('เทสต์โหมด AI อ่านหน้าสแกนทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally { bbFiles = _files; bbItems = _items; window.callAI = _ai; window.confirm = _cf; CFG.key = _key; }
+})();
+
+
+ok('มีปุ่มคืนค่าที่ฝังมาในไฟล์', typeof resetBankCfg === 'function');
+(function(){
+  const _url = CFG.url, _pass = CFG.pass, _paused = BANK._paused;
+  try{
+    CFG.url = 'https://script.google.com/macros/s/OLD/exec'; CFG.pass = 'ผิด';
+    BANK._paused = true;
+    resetBankCfg();
+    const hasDef = !!(CFG_DEF.url || CFG_DEF.pass);
+    ok('กดแล้วดึงค่าที่ฝังมาในไฟล์กลับมาใช้',
+      !hasDef || ((!CFG_DEF.url || CFG.url === CFG_DEF.url) && (!CFG_DEF.pass || CFG.pass === CFG_DEF.pass)));
+    /* ไฟล์ที่ไม่ได้ฝังค่ามา ปุ่มนี้ต้องไม่ทำอะไรและต้องไม่พัง */
+    ok('คืนค่าแล้วปลดการพักคิวให้ด้วย (เฉพาะไฟล์ที่ฝังค่ามา)',
+      hasDef ? BANK._paused === false : true);
+  } finally { CFG.url = _url; CFG.pass = _pass; BANK._paused = _paused; storeCfg(); }
 })();
 
 /* ══ 20. วินิจฉัยการเชื่อมต่อคลังกลาง — ต้องบอกสาเหตุจริง ไม่ใช่ให้เดาเอง ══ */
