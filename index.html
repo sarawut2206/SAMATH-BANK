@@ -9036,7 +9036,17 @@ async function extractFile(file, onProg){
       if(onProg) onProg(i, doc.numPages);
       const pg = await doc.getPage(i);
       const tc = await pg.getTextContent();
-      const line = tc.items.map(x=>x.str).join(' ').trim();
+      /* pdf.js คืนข้อความเป็นชิ้น ๆ ถ้าต่อด้วยช่องว่างล้วนจะเสียการขึ้นบรรทัด
+         ทำให้ตัวแยกข้อสอบหา "เลขข้อต้นบรรทัด" ไม่เจอ จึงใช้ hasEOL และพิกัด y ช่วยตัดบรรทัด */
+      let line = '', lastY = null;
+      tc.items.forEach(it=>{
+        const y = (it.transform && it.transform[5]);
+        if(lastY !== null && y !== undefined && Math.abs(y - lastY) > 2) line += '\n';
+        line += it.str;
+        if(it.hasEOL) line += '\n'; else line += ' ';
+        if(y !== undefined) lastY = y;
+      });
+      line = line.replace(/[ \t]+/g,' ').replace(/[ \t]*\n[ \t]*/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
       if(line.length >= SCAN_MIN_CHARS){ txt += '\n\n[หน้า ' + i + ']\n' + line; }
       else { scanPages.push(pg); }
     }
@@ -9161,8 +9171,9 @@ function cleanLine(s){
 /* ดึงตารางเฉลยถ้ามี เช่น "เฉลย 1. ก 2. ค 3. ข" หรือ "1) 2  2) 4" */
 function parseAnswerKey(text){
   const key = {};
-  const tail = String(text||'');
-  const zone = tail.split(/เฉลย|คำตอบที่ถูกต้อง|กระดาษคำตอบ/).slice(1).join('\n');
+  /* หนังสือรวมหลายชุดจะมีคำว่า "เฉลย" หลายที่ เก็บทุกโซนไม่ใช่แค่โซนแรก */
+  const zone = String(text||'').split(/เฉลย|คำตอบที่ถูกต้อง|กระดาษคำตอบ/).slice(1)
+    .map(z=>z.slice(0, 3000)).join('\n');
   if(!zone.trim()) return key;
   const re = /(\d{1,3})\s*[.)]?\s*([กขคงจ]|[1-5])(?![\d\u0E00-\u0E7F])/g;
   let m;
@@ -9196,39 +9207,69 @@ function splitChoices(body){
     while(end < seq.length && seq[end] === seq[end-1] + 1) end++;
     const picked = marks.slice(start, end);
     const stem = cleanLine(body.slice(0, picked[0].i));
-    const choices = picked.map((x, k) => cleanLine(
-      body.slice(x.at, (k+1 < picked.length) ? picked[k+1].i : body.length)));
+    const choices = picked.map((x, k) => {
+      let seg = body.slice(x.at, (k+1 < picked.length) ? picked[k+1].i : body.length);
+      /* ตัวเลือกตัวสุดท้ายมักลามไปกินโจทย์ข้อถัดไป ตัดทิ้งตรงเลขข้อที่โผล่มา */
+      const nx = seg.search(/\s\d{1,3}\s*[.)]\s/);
+      if(nx > 0) seg = seg.slice(0, nx);
+      return cleanLine(seg);
+    });
     if(!stem || choices.some(c=>!c)) continue;
     return { stem: stem, choices: choices, kind: kind };
   }
   return null;
 }
+
+/* รหัสตัวชี้วัดบอกชั้นอยู่ในตัว เช่น (ค 1.1 ป.4/2) จึงใช้จัดชั้นให้อัตโนมัติได้ */
+function gradeFromInd(ind){
+  const m = String(ind||'').match(/([ปม])\.(\d)/);
+  if(!m) return '';
+  const g = m[1] + '.' + m[2];
+  return (typeof GRADES !== 'undefined' && GRADES.indexOf(g) >= 0) ? g : '';
+}
 function parseItemsFromText(text, opt){
   opt = opt || {};
+  /* ไฟล์แต่ละเล่มวางรูปแบบไม่เหมือนกัน บางเล่มเลขข้ออยู่ต้นบรรทัด บางเล่มถูกต่อเป็นบรรทัดเดียว
+     บางเล่มตัวเลือกเป็น ก ข ค ง บางเล่มเป็น 1 2 3 4 และบางเล่มปนกันทั้งสองแบบในไฟล์เดียว
+     จึงลองทุกแบบแล้วเลือกแบบที่แยกได้มากที่สุด */
+  let best = [];
+  [[false,false],[false,true],[true,false],[true,true]].forEach(([loose, elim])=>{
+    const r = parseItemsCore(text, opt, loose, elim);
+    if(r.length > best.length) best = r;
+  });
+  return best;
+}
+function parseItemsCore(text, opt, loose, elimNumeric){
   const src = String(text||'').replace(/\r/g,'');
+  const QRE = loose ? /(?:^|\n|\s{2,})\s*(\d{1,3})\s*[.)]\s+/g : RE_QNUM;
   /* ตัดส่วนเฉลยออกจากเนื้อข้อสอบ แต่เก็บไว้ใช้จับคู่คำตอบ */
   const key = parseAnswerKey(src);
-  const body = src.split(/\nเฉลย|\nคำตอบที่ถูกต้อง/)[0];
+  /* ห้ามตัดทิ้งทุกอย่างหลังคำว่า "เฉลย" เพราะไฟล์รวมหลายชั้นมีเฉลยคั่นกลางเล่ม
+     ปล่อยให้ตัวแยกทำงานทั้งไฟล์ แถวเฉลยที่ไม่มีโจทย์จะถูกคัดทิ้งเองอยู่แล้ว */
+  const body = src;
   const raw = [];
-  RE_QNUM.lastIndex = 0;
+  QRE.lastIndex = 0;
   let m;
-  while((m = RE_QNUM.exec(body))) raw.push({ n:+m[1], at:m.index + m[0].length, i:m.index });
+  while((m = QRE.exec(body))) raw.push({ n:+m[1], at:m.index + m[0].length, i:m.index });
   /* ข้อสอบที่ตัวเลือกเป็น 1 2 3 4 จะทำให้เลขตัวเลือกถูกนับเป็นเลขข้อด้วย
      จึงมองหา "ชุดเลขที่เริ่มจาก 1 แล้วไล่ขึ้นติดกันอย่างน้อย 3 ตัว" แล้วถือว่านั่นคือตัวเลือก */
   const isChoice = new Array(raw.length).fill(false);
-  /* ถ้าไฟล์ใช้ตัวเลือกเป็น ก ข ค ง อยู่แล้ว เลขที่พบทั้งหมดคือเลขข้อ ไม่ต้องคัดออก */
-  RE_CH_TH.lastIndex = 0;
-  const thMarks = (body.match(/(?:^|\s)[กขคงจ]\s*[.)]\s+/g) || []).length;
-  if(thMarks < 3){
+  /* เล่มที่ตัวเลือกเป็น ก ข ค ง ล้วน ไม่ต้องคัดเลขออก
+     ส่วนเล่มที่ตัวเลือกเป็น 1 2 3 4 ต้องคัด เพราะเลขตัวเลือกปนกับเลขข้อ */
+  if(elimNumeric){
     for(let i=0;i<raw.length;i++){
       if(isChoice[i] || raw[i].n !== 1) continue;
       let run = 1;
       while(i+run < raw.length && raw[i+run].n === run + 1 && !isChoice[i+run]
             && (raw[i+run].i - raw[i+run-1].i) < 400) run++;
-      if(run >= 3){ for(let k=0;k<run;k++) isChoice[i+k] = true; i += run - 1; }
+      /* ชุดตัวเลือกมี 3–5 ตัวและต้องมีเลขข้อนำหน้ามาก่อน
+         ส่วนลำดับเลขข้อของทั้งชุดจะยาวกว่านั้นมาก จึงไม่ถูกเข้าใจผิดว่าเป็นตัวเลือก */
+      if(run >= 3 && run <= 5 && i > 0){ for(let k=0;k<run;k++) isChoice[i+k] = true; i += run - 1; }
     }
   }
-  const marks = raw.filter((x,i)=>!isChoice[i]);
+  const marks = raw.filter((x,i)=>!isChoice[i])
+    /* เลขข้อของข้อสอบต้องไล่ขึ้น ไม่ใช่เลขที่โผล่มาปนกลางข้อความ */
+    .filter((x,i,arr)=> i === 0 || x.n > arr[i-1].n || x.n === 1);
   const out = [];
   const seen = new Set();
   marks.forEach((mk, i)=>{
@@ -9241,9 +9282,16 @@ function parseItemsFromText(text, opt){
     if(seen.has(sig)) return;
     seen.add(sig);
     const ans = (key[mk.n] !== undefined && key[mk.n] < sp.choices.length) ? key[mk.n] : null;
+    /* ข้อสอบไทยวงเล็บรหัสตัวชี้วัดไว้ท้ายโจทย์ เขียนได้หลายแบบ
+       (ค 1.1 ป.1/5) · (มฐ. ค 1.1 ป.5/1, 5, 9) · (ค 2.2 ป. 5 /1)
+       ดึงรหัสเก็บแยก แล้วตัดวงเล็บทั้งก้อนออกจากโจทย์ */
+    const im = sp.stem.match(/\(\s*(?:มฐ\.?\s*)?(ค\s*\d\.\d)\s*([ปม])\s*\.\s*(\d)\s*\/\s*(\d+)[^)]*\)/);
+    const indTxt = im ? (im[1].replace(/\s+/g,' ').trim() + ' ' + im[2] + '.' + im[3] + '/' + im[4]) : '';
     out.push({
       no: mk.n,
-      q: sp.stem,
+      ind: indTxt,
+      q: im ? (sp.stem.slice(0, im.index) + sp.stem.slice(im.index + im[0].length)).replace(/\s{2,}/g,' ').trim()
+            : sp.stem,
       choices: sp.choices,
       ans: ans,
       explain: '',
@@ -9264,15 +9312,17 @@ function importItemsToBank(items, scope, opt){
   items.forEach(q=>{
     if(!q.q || !Array.isArray(q.choices) || q.choices.length < 3) return;
     const level = q.level || 'ปานกลาง';
-    const bucket = BANK.itemKeyOf(scope.grade || '', scope.topic || '', scope.sub || '', level);
-    const key = BANK.itemKeyOf(scope.grade || '', scope.topic || '', scope.sub || '',
+    /* ไฟล์รวมหลายชั้น ใช้รหัสตัวชี้วัดท้ายโจทย์จัดชั้นให้เองเมื่อมี */
+    const grade = gradeFromInd(q.ind) || scope.grade || '';
+    const bucket = BANK.itemKeyOf(grade, scope.topic || '', scope.sub || '', level);
+    const key = BANK.itemKeyOf(grade, scope.topic || '', scope.sub || '',
                               level + '_' + hash36(canon({q:q.q})));
     const rec = {
-      kind:'item', key:key, bucket:bucket, grade:scope.grade||'', topic:scope.topic||'',
+      kind:'item', key:key, bucket:bucket, grade:grade, topic:scope.topic||'',
       sub:scope.sub||'', ts:Date.now(), hits:0,
       q: { q:q.q, choices:q.choices.slice(), ans:(q.ans===null?0:q.ans), explain:q.explain||'',
            level:level, topic:scope.topic||'', skill:q.skill||scope.topic||'',
-           imported:true, needKey:(q.ans===null), source:q.src||'' },
+           imported:true, needKey:(q.ans===null), ind:q.ind||'', source:q.src||'' },
       meta:{ level:level, imported:true, source:q.src||'' }
     };
     /* ข้อที่นำเข้าจากไฟล์ของครูเก็บไว้ในเครื่องเป็นค่าเริ่มต้น ไม่ดันขึ้นคลังกลาง */
