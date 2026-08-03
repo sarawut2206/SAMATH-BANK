@@ -275,6 +275,9 @@ textarea{resize:vertical;min-height:70px;line-height:1.6;}
 .pickbox .pk.pk-all{background:var(--card2);font-weight:600;position:sticky;top:0;z-index:1;}
 .pickbox .pk.pk-cus{color:var(--teal2);}
 .pickbox.dim{opacity:.5;pointer-events:none;}
+table.bbgrid tr.selrow{background:var(--tealsoft);}
+table.bbgrid td,table.bbgrid th{vertical-align:top;}
+table.bbgrid select{padding:4px 6px;font-size:14px;}
 .pkbar{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;}
 ".pkbar .pkcount{font-size:14.5px;color:var(--muted);margin-left:auto;}
 .workarea{min-width:0;}
@@ -458,6 +461,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
       <button class="rail-btn" data-page="exam" onclick="go('exam')"><span class="rail-ico">▤</span><span class="lbl">สตูดิโอข้อสอบ</span></button>
       <button class="rail-btn" data-page="stu" onclick="go('stu')"><span class="rail-ico">◑</span><span class="lbl">นักเรียน</span></button>
       <div class="rail-sec">คลัง</div>
+      <button class="rail-btn" data-page="build" onclick="go('build')"><span class="rail-ico">⚒</span><span class="lbl">สร้างคลังจากไฟล์</span></button>
       <button class="rail-btn" data-page="lib" onclick="go('lib')"><span class="rail-ico">⇪</span><span class="lbl">คลังความรู้</span></button>
       <button class="rail-btn" data-page="repo" onclick="go('repo')"><span class="rail-ico">▦</span><span class="lbl">คลังกลาง</span></button>
       <button class="rail-btn" data-page="curr" onclick="go('curr')"><span class="rail-ico">◈</span><span class="lbl">หลักสูตร</span></button>
@@ -510,6 +514,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <button class="qa-btn" onclick="qaExam('onet')"><span class="qa-ico">◈</span><span class="qa-t">ข้อสอบแนว O-NET</span><span class="qa-d">สำหรับติว ป.6 / ม.3 / ม.6</span></button>
               <button class="qa-btn" onclick="qaBook('textbook')"><span class="qa-ico">▥</span><span class="qa-t">สร้างหนังสือทั้งเล่ม</span><span class="qa-d">วางโครงจากหลักสูตร แล้วสั่งเขียนทีละบท</span></button>
               <button class="qa-btn" onclick="qaExam('achv')"><span class="qa-ico">✓</span><span class="qa-t">วัดผลสัมฤทธิ์ตามตัวชี้วัด</span><span class="qa-d">ทั้งชั้นปี พร้อมรหัสตัวชี้วัดกำกับทุกข้อ</span></button>
+              <button class="qa-btn" onclick="go('build')"><span class="qa-ico">⚒</span><span class="qa-t">สร้างคลังจากไฟล์ข้อสอบ</span><span class="qa-d">แยกโจทย์จาก PDF/Word เข้าคลัง ไม่เรียก AI ไม่เสียเงิน</span></button>
               <button class="qa-btn" onclick="go('lib')"><span class="qa-ico">⇪</span><span class="qa-t">อัปโหลดเข้าคลังความรู้</span><span class="qa-d">โยนไฟล์ PDF หรือ Word แล้วให้โปรแกรมถอดเป็นฐานข้อมูล</span></button>
               <button class="qa-btn" onclick="go('stu')"><span class="qa-ico">◑</span><span class="qa-t">วิเคราะห์นักเรียน</span><span class="qa-d">บันทึกผลรายข้อ แล้วดูแผนที่ทักษะรายคน</span></button>
             </div>
@@ -1070,6 +1075,100 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
               <div class="card-hd"><h3>ความรู้ที่บันทึกไว้แล้ว</h3>
                 <span class="chip teal" id="libCountChip"></span></div>
               <div class="card-bd"><div id="libSaved"></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ═══════ BANK BUILDER ═══════ -->
+      <section class="page" id="pg-build">
+        <div class="ph">
+          <h1>สร้างคลังจากไฟล์</h1>
+          <p>โยนไฟล์ข้อสอบที่มีอยู่แล้วเข้ามา โปรแกรมแยกโจทย์ ตัวเลือก และเฉลยให้เอง <b>ไม่เรียก AI ไม่เสียเงิน</b> แล้วเก็บเข้าคลังรายข้อ นำไปประกอบเป็นชุดข้อสอบได้ทันที</p>
+        </div>
+
+        <div class="studio">
+          <div class="order">
+            <div class="card mb20">
+              <div class="card-hd"><h3>ขั้นที่ 1 · ใส่ไฟล์</h3></div>
+              <div class="card-bd">
+                <div class="dropzone" id="bbDrop" onclick="bbPick()" ondrop="bbOnDrop(event)"
+                     ondragover="bbDragOver(event)" ondragleave="bbDragOut()">
+                  <div class="dz-ico">⇪</div>
+                  <div class="dz-t">ลากไฟล์หรือทั้งโฟลเดอร์มาวางตรงนี้</div>
+                  <div class="dz-d">PDF · Word · ebook · สไลด์ · ไฟล์ข้อความ — ไฟล์ที่เป็นภาพสแกนให้ใช้คลังความรู้แทน</div>
+                </div>
+                <input type="file" id="bbFile" multiple style="display:none" onchange="bbTake(this.files)">
+                <input type="file" id="bbDir" multiple webkitdirectory directory style="display:none" onchange="bbTake(this.files)">
+                <div class="pkbar">
+                  <button class="btn btn-ghost btn-sm" onclick="bbPick()">เลือกไฟล์</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbPickDir()">เลือกทั้งโฟลเดอร์</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbClear()">ล้างทั้งหมด</button>
+                </div>
+                <div id="bbFiles" class="mt10"></div>
+              </div>
+            </div>
+
+            <div class="card mb20">
+              <div class="card-hd"><h3>ขั้นที่ 2 · ติดป้ายแล้วแยกข้อ</h3></div>
+              <div class="card-bd">
+                <div class="row2">
+                  <div class="fld"><label for="bbGrade">ระดับชั้น</label><select id="bbGrade" onchange="bbOnGrade()"></select></div>
+                  <div class="fld"><label for="bbLevel">ระดับความยาก</label>
+                    <select id="bbLevel"><option>ง่าย</option><option selected>ปานกลาง</option><option>ยาก</option></select></div>
+                </div>
+                <div class="fld"><label for="bbTopic">บทเรียน</label><select id="bbTopic"></select></div>
+                <button class="btn btn-primary w100" id="bbGo" onclick="bbParse()" disabled>แยกข้อสอบจากไฟล์ (ไม่ใช้ AI)</button>
+                <div class="note info mt10">ถ้าโจทย์มีวงเล็บรหัสตัวชี้วัดกำกับ เช่น (ค 1.1 ป.5/1) ระบบจะจัดชั้นให้เองรายข้อ อัปโหลดเล่มรวมหลายชั้นทีเดียวได้</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-hd"><h3>ขั้นที่ 3 · เก็บเข้าคลัง</h3></div>
+              <div class="card-bd">
+                <div class="fld"><label for="bbShare">จะส่งขึ้นคลังกลางด้วยหรือไม่</label>
+                  <select id="bbShare"><option value="0" selected>เก็บในเครื่องนี้เท่านั้น</option>
+                    <option value="1">ส่งขึ้นคลังกลางด้วย</option></select>
+                  <div class="hint">ข้อจากไฟล์ของสำนักพิมพ์ ควรเก็บไว้ใช้ในห้องเรียนของตนเอง ไม่ควรเผยแพร่ต่อ</div></div>
+                <button class="btn btn-primary w100" id="bbSave" onclick="bbSave(false)" disabled>เก็บทั้งหมดเข้าคลังรายข้อ</button>
+                <button class="btn btn-ghost w100 mt10" id="bbJson" onclick="bbExportJSON(false)" disabled>ดาวน์โหลดเป็นไฟล์สำรอง .json</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="workarea">
+            <div class="card">
+              <div class="card-hd"><h3>ข้อที่แยกได้</h3><span class="chip teal" id="bbNote"></span></div>
+              <div class="card-bd" id="bbBulk" style="display:none;border-bottom:1px solid var(--line)">
+                <div class="pkbar" style="margin:0">
+                  <b class="small">เลือก:</b>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectAll(true)">ทั้งหมด</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectAll(false)">ไม่เลือกเลย</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('nokey')">ที่ยังไม่มีเฉลย</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('haskey')">ที่มีเฉลยแล้ว</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('grade')">ชั้นที่เลือกทางซ้าย</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('notopic')">ที่ยังไม่ระบุบท</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('short')">ที่น่าจะแยกเพี้ยน</button>
+                </div>
+                <div class="pkbar">
+                  <b class="small">ทำกับที่เลือก:</b>
+                  <button class="btn btn-ghost btn-sm" onclick="bbApply('grade')">ตั้งชั้น</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbApply('topic')">ตั้งบท</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbApply('level')">ตั้งระดับ</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbKeepSelected()">เก็บเฉพาะที่เลือก</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbDropSelected()">ลบที่เลือก</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbDropNoKey()">ตัดข้อที่ไม่มีเฉลย</button>
+                  <span class="pkcount" id="bbBulkNote"></span>
+                </div>
+                <div class="pkbar">
+                  <b class="small">เฉพาะที่เลือก:</b>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSave(true)">เก็บเข้าคลัง</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbExportJSON(true)">ดาวน์โหลด .json</button>
+                  <span class="pkcount">กด Shift ค้างแล้วคลิก = เลือกทีเดียวทั้งช่วง</span>
+                </div>
+              </div>
+              <div class="card-bd" style="padding:0"><div id="bbItems"></div></div>
             </div>
           </div>
         </div>
@@ -9313,15 +9412,16 @@ function importItemsToBank(items, scope, opt){
     if(!q.q || !Array.isArray(q.choices) || q.choices.length < 3) return;
     const level = q.level || 'ปานกลาง';
     /* ไฟล์รวมหลายชั้น ใช้รหัสตัวชี้วัดท้ายโจทย์จัดชั้นให้เองเมื่อมี */
-    const grade = gradeFromInd(q.ind) || scope.grade || '';
-    const bucket = BANK.itemKeyOf(grade, scope.topic || '', scope.sub || '', level);
-    const key = BANK.itemKeyOf(grade, scope.topic || '', scope.sub || '',
+    const grade = q.grade || gradeFromInd(q.ind) || scope.grade || '';
+    const topic = q.topic || scope.topic || '';
+    const bucket = BANK.itemKeyOf(grade, topic, scope.sub || '', level);
+    const key = BANK.itemKeyOf(grade, topic, scope.sub || '',
                               level + '_' + hash36(canon({q:q.q})));
     const rec = {
-      kind:'item', key:key, bucket:bucket, grade:grade, topic:scope.topic||'',
+      kind:'item', key:key, bucket:bucket, grade:grade, topic:topic,
       sub:scope.sub||'', ts:Date.now(), hits:0,
       q: { q:q.q, choices:q.choices.slice(), ans:(q.ans===null?0:q.ans), explain:q.explain||'',
-           level:level, topic:scope.topic||'', skill:q.skill||scope.topic||'',
+           level:level, topic:topic, skill:q.skill||topic,
            imported:true, needKey:(q.ans===null), ind:q.ind||'', source:q.src||'' },
       meta:{ level:level, imported:true, source:q.src||'' }
     };
@@ -9332,6 +9432,248 @@ function importItemsToBank(items, scope, opt){
   });
   BANK._save();
   return n;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   สร้างคลังจากไฟล์ (Bank Builder ในตัว)
+   โยนไฟล์ข้อสอบเข้ามา → แยกโจทย์/ตัวเลือก/เฉลยด้วยตัวโปรแกรมเอง (ไม่เรียก AI)
+   → ติ๊กเลือก แก้เป็นชุด → บันทึกเข้าคลังรายข้อ ใช้ประกอบข้อสอบได้ทันที
+   ════════════════════════════════════════════════════════════════════ */
+let bbFiles = [];
+let bbItems = [];
+let bbLastSel = -1;
+const BB_LT = ['ก','ข','ค','ง','จ'];
+
+function initBBUI(){
+  fillSel('bbGrade', GRADES, 'ป.6');
+  bbOnGrade();
+  bbPaintFiles(); bbPaintItems();
+}
+function bbOnGrade(){
+  const g = document.getElementById('bbGrade').value;
+  fillSel('bbTopic', [{v:'',t:'— ไม่ระบุบท —'}].concat(topicsOf(g).map(t=>({v:t.topic,t:t.topic}))), '');
+}
+function bbPick(){ document.getElementById('bbFile').click(); }
+function bbPickDir(){ document.getElementById('bbDir').click(); }
+function bbDragOver(e){ e.preventDefault(); document.getElementById('bbDrop').classList.add('over'); }
+function bbDragOut(){ document.getElementById('bbDrop').classList.remove('over'); }
+async function bbOnDrop(e){
+  e.preventDefault(); document.getElementById('bbDrop').classList.remove('over');
+  const dt = e.dataTransfer; if(!dt) return;
+  const items = dt.items ? Array.from(dt.items) : [];
+  if(items.length && typeof items[0].webkitGetAsEntry === 'function'){
+    const entries = items.map(i=>i.webkitGetAsEntry()).filter(Boolean);
+    if(entries.some(x=>x.isDirectory)){
+      toast('กำลังไล่เก็บไฟล์ในโฟลเดอร์…');
+      const out = [];
+      for(const en of entries) await walkEntry(en, '', out);
+      if(out.length){ await bbTake(out); return; }
+    }
+  }
+  bbTake(dt.files || []);
+}
+async function bbTake(list){
+  const arr = Array.from(list||[]).map(x=>x.file ? x : {file:x, path: fileRelPath(x)});
+  if(!arr.length) return;
+  if(arr.length > LIB_MAX_FILES){ toast('รับได้ครั้งละไม่เกิน ' + LIB_MAX_FILES + ' ไฟล์'); arr.length = LIB_MAX_FILES; }
+  const g = (guessFromName(arr.map(x=>x.path).join(' ')) || {}).grade;
+  if(g && GRADES.indexOf(g) >= 0){ document.getElementById('bbGrade').value = g; bbOnGrade(); }
+  for(const it of arr){
+    const f = it.file, path = it.path || f.name;
+    if(/^~\$|^\./.test(f.name) || /(__MACOSX|\.DS_Store|Thumbs\.db)/i.test(path)) continue;
+    if(f.size > 40*1024*1024){ toast('ข้าม ' + f.name + ' — ใหญ่เกิน 40 MB'); continue; }
+    const row = { name:f.name, path:path, folder:folderOf(path), state:'กำลังอ่าน…', err:'', data:null };
+    bbFiles.push(row); bbPaintFiles();
+    try{
+      row.data = await extractFile(f, (i,n,msg)=>{ row.state = msg || ('อ่านหน้า ' + i + '/' + n); bbPaintFiles(); });
+      row.state = row.data.scanned
+        ? ('เป็นหน้าสแกน ' + row.data.images.length + ' หน้า — ใช้คลังความรู้ (โหมด AI) แทน')
+        : ('อ่านข้อความได้ ' + row.data.text.length.toLocaleString() + ' ตัวอักษร');
+    }catch(e){ row.err = e.message; row.state = 'อ่านไม่สำเร็จ'; }
+    bbPaintFiles();
+  }
+  document.getElementById('bbFile').value = '';
+  document.getElementById('bbDir').value = '';
+}
+function bbPaintFiles(){
+  const host = document.getElementById('bbFiles');
+  if(!host) return;
+  if(!bbFiles.length){ host.innerHTML = ''; document.getElementById('bbGo').disabled = true; return; }
+  const g = {};
+  bbFiles.forEach((f,i)=>{ (g[f.folder]=g[f.folder]||[]).push(Object.assign({idx:i}, f)); });
+  host.innerHTML = Object.keys(g).map(k=>
+    (k ? `<div class="obox">📁 ${esc(k)} · ${g[k].length} ไฟล์</div>` : '')
+    + g[k].map(f=>`<div class="orow${f.err?' off':''}">
+        <span class="on-n">${f.idx+1}</span>
+        <span class="on-t">${esc(f.name)}<small>${esc(f.err || f.state)}</small></span>
+        <span class="on-b"><button class="btn btn-ghost btn-sm" onclick="bbDropFile(${f.idx})">✕</button></span>
+      </div>`).join('')).join('');
+  document.getElementById('bbGo').disabled = !bbFiles.some(f=>f.data && !f.err && (f.data.text||'').length > 40);
+}
+function bbDropFile(i){ bbFiles.splice(i,1); bbPaintFiles(); }
+function bbClear(){ bbFiles = []; bbItems = []; bbLastSel = -1; bbPaintFiles(); bbPaintItems(); }
+
+/* ── แยกข้อ ── */
+function bbParse(){
+  const g = document.getElementById('bbGrade').value;
+  const topic = document.getElementById('bbTopic').value;
+  const level = document.getElementById('bbLevel').value;
+  let got = [];
+  bbFiles.filter(f=>f.data && !f.err).forEach(f=>{
+    let lastG = '';
+    got = got.concat(parseItemsFromText(f.data.text, {topic:topic, level:level, src:f.name})
+      .map(q=>{
+        const gi = gradeFromInd(q.ind);
+        if(gi) lastG = gi;
+        return Object.assign(q, {grade: gi || lastG || g, topic:topic, sub:'', file:f.name});
+      }));
+  });
+  if(!got.length){ toast('แยกไม่ได้ — ไฟล์อาจเป็นหน้าสแกน หรือไม่มีเลขข้อกับตัวเลือกที่อ่านออก'); return; }
+  bbItems = bbItems.concat(got);
+  bbPaintItems();
+  toast('แยกได้ ' + got.length + ' ข้อ (รวม ' + bbItems.length + ' ข้อ) โดยไม่เสียค่า AI');
+}
+function bbSelCount(){ return bbItems.filter(q=>q.sel).length; }
+function bbPaintItems(){
+  const host = document.getElementById('bbItems');
+  if(!host) return;
+  const n = bbSelCount();
+  const note = document.getElementById('bbNote');
+  if(note) note.textContent = bbItems.length
+    ? (bbItems.length + ' ข้อ · มีเฉลยแล้ว ' + bbItems.filter(q=>q.ans!==null && q.ans!==undefined).length
+       + ' ข้อ' + (n ? ' · เลือกไว้ ' + n : ''))
+    : '';
+  const bulk = document.getElementById('bbBulk');
+  if(bulk) bulk.style.display = bbItems.length ? '' : 'none';
+  const bn = document.getElementById('bbBulkNote');
+  if(bn) bn.textContent = n ? ('จะทำกับ ' + n + ' ข้อที่เลือก') : 'ยังไม่ได้เลือกข้อใด';
+  ['bbSave','bbJson'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = !bbItems.length; });
+  if(!bbItems.length){
+    host.innerHTML = `<div class="empty"><div class="empty-ico">⇪</div><h4>ยังไม่มีข้อ</h4>
+      <p>โยนไฟล์ข้อสอบเข้ามาทางซ้าย แล้วกดแยกข้อสอบ</p></div>`;
+    return;
+  }
+  const allOn = bbItems.every(q=>q.sel);
+  host.innerHTML = `<div class="gridwrap"><table class="sgrid bbgrid"><thead><tr>
+      <th style="width:34px"><input type="checkbox"${allOn?' checked':''} onchange="bbSelectAll(this.checked)"></th>
+      <th style="width:42px">ข้อ</th><th class="sticky" style="min-width:280px">โจทย์</th>
+      <th style="min-width:200px">ตัวเลือก</th><th style="width:92px">ชั้น</th>
+      <th style="width:76px">เฉลย</th><th style="width:98px">ระดับ</th><th style="width:36px"></th>
+    </tr></thead><tbody>`
+    + bbItems.map((q,i)=>`<tr${q.sel?' class="selrow"':''}>
+        <td><input type="checkbox"${q.sel?' checked':''} onchange="bbSelectOne(${i}, this.checked, event)"></td>
+        <td>${q.no || i+1}</td>
+        <td class="sticky" style="text-align:left">${esc(q.q.slice(0,140))}${q.q.length>140?'…':''}
+          <br><span class="small mut">${q.ind?esc(q.ind)+' · ':''}${q.topic?esc(q.topic)+' · ':''}${esc(q.file||'')}</span></td>
+        <td style="text-align:left">${q.choices.map((c,k)=>`${BB_LT[k]}. ${esc(c.slice(0,30))}`).join('<br>')}</td>
+        <td><select onchange="bbSetGrade(${i}, this.value)">
+            ${GRADES.map(x=>`<option${q.grade===x?' selected':''}>${x}</option>`).join('')}</select></td>
+        <td><select onchange="bbSetAns(${i}, this.value)"><option value="">—</option>
+            ${q.choices.map((c,k)=>`<option value="${k}"${q.ans===k?' selected':''}>${BB_LT[k]}</option>`).join('')}</select></td>
+        <td><select onchange="bbSetLv(${i}, this.value)">
+            ${['ง่าย','ปานกลาง','ยาก'].map(L=>`<option${q.level===L?' selected':''}>${L}</option>`).join('')}</select></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="bbDropItem(${i})">✕</button></td></tr>`).join('')
+    + `</tbody></table></div>`;
+}
+function bbSetAns(i,v){ bbItems[i].ans = (v==='') ? null : +v; bbPaintItems(); }
+function bbSetLv(i,v){ bbItems[i].level = v; bbPaintItems(); }
+function bbSetGrade(i,v){ bbItems[i].grade = v; bbPaintItems(); }
+function bbDropItem(i){ bbItems.splice(i,1); bbPaintItems(); }
+/* ── ระบบเลือก ── */
+function bbSelectOne(i, on, ev){
+  if(ev && ev.shiftKey && bbLastSel >= 0){
+    const a = Math.min(bbLastSel,i), b = Math.max(bbLastSel,i);
+    for(let k=a;k<=b;k++) bbItems[k].sel = on;
+  } else bbItems[i].sel = on;
+  bbLastSel = i;
+  bbPaintItems();
+}
+function bbSelectAll(on){ bbItems.forEach(q=>q.sel = on); bbPaintItems(); }
+function bbSelectBy(kind){
+  const g = document.getElementById('bbGrade').value;
+  bbItems.forEach(q=>{
+    if(kind==='nokey')        q.sel = (q.ans === null || q.ans === undefined);
+    else if(kind==='haskey')  q.sel = (q.ans !== null && q.ans !== undefined);
+    else if(kind==='grade')   q.sel = (q.grade === g);
+    else if(kind==='notopic') q.sel = !q.topic;
+    else if(kind==='short')   q.sel = q.choices.some(c=>c.length < 2) || q.q.length < 15;
+  });
+  bbPaintItems();
+  toast('เลือกไว้ ' + bbSelCount() + ' ข้อ');
+}
+function bbSelected(){ return bbItems.filter(q=>q.sel); }
+function bbNeedSel(){
+  if(!bbSelCount()){ toast('ยังไม่ได้เลือกข้อ — ติ๊กช่องหน้าข้อก่อน'); return false; }
+  return true;
+}
+function bbApply(what){
+  if(!bbNeedSel()) return;
+  const g = document.getElementById('bbGrade').value;
+  const t = document.getElementById('bbTopic').value;
+  const L = document.getElementById('bbLevel').value;
+  bbSelected().forEach(q=>{
+    if(what==='grade') q.grade = g;
+    if(what==='topic'){ q.topic = t; q.skill = t; }
+    if(what==='level') q.level = L;
+  });
+  bbPaintItems();
+  toast(what==='grade' ? ('ตั้งชั้นเป็น ' + g) : what==='topic' ? (t?('ตั้งบทเป็น '+t):'ล้างบทออก') : ('ตั้งระดับเป็น ' + L));
+}
+function bbDropSelected(){
+  if(!bbNeedSel()) return;
+  const n = bbSelCount();
+  bbItems = bbItems.filter(q=>!q.sel); bbLastSel = -1;
+  bbPaintItems(); toast('ลบออก ' + n + ' ข้อ');
+}
+function bbKeepSelected(){
+  if(!bbNeedSel()) return;
+  const n = bbItems.length - bbSelCount();
+  bbItems = bbItems.filter(q=>q.sel); bbLastSel = -1;
+  bbPaintItems(); toast('เก็บเฉพาะที่เลือก · ลบออก ' + n + ' ข้อ');
+}
+function bbDropNoKey(){
+  const before = bbItems.length;
+  bbItems = bbItems.filter(q=>q.ans !== null && q.ans !== undefined);
+  bbPaintItems(); toast('ตัดข้อที่ไม่มีเฉลยออก ' + (before - bbItems.length) + ' ข้อ');
+}
+/* ── บันทึกเข้าคลังรายข้อของโปรแกรมนี้เลย ── */
+function bbSave(onlySel){
+  const list = onlySel ? bbSelected() : bbItems;
+  if(onlySel && !bbNeedSel()) return;
+  if(!list.length){ toast('ยังไม่มีข้อที่จะบันทึก'); return; }
+  const share = document.getElementById('bbShare').value === '1';
+  const n = importItemsToBank(list, { grade: document.getElementById('bbGrade').value,
+    topic: document.getElementById('bbTopic').value, sub:'' }, {toSheet: share});
+  bbPaintItems(); renderRepo(); refreshDash();
+  toast('เก็บเข้าคลังรายข้อแล้ว ' + n + ' ข้อ — ไปสตูดิโอข้อสอบ เลือกแหล่งที่มาเป็น "ประกอบจากคลัง" ได้เลย');
+}
+function bbExportJSON(onlySel){
+  const list = onlySel ? bbSelected() : bbItems;
+  if(onlySel && !bbNeedSel()) return;
+  if(!list.length){ toast('ยังไม่มีข้อที่จะส่งออก'); return; }
+  const scope = { grade: document.getElementById('bbGrade').value,
+                  topic: document.getElementById('bbTopic').value, sub:'' };
+  const item = {};
+  list.forEach(q=>{
+    const level = q.level || 'ปานกลาง';
+    const grade = q.grade || scope.grade || '';
+    const topic = q.topic || scope.topic || '';
+    const key = BANK.itemKeyOf(grade, topic, '', level + '_' + hash36(canon({q:q.q})));
+    item[key] = { kind:'item', key:key, bucket:BANK.itemKeyOf(grade, topic, '', level),
+      grade:grade, topic:topic, sub:'', ts:Date.now(), hits:0, synced:0, localOnly:1,
+      q:{ q:q.q, choices:q.choices.slice(), ans:(q.ans===null||q.ans===undefined)?0:q.ans, explain:'',
+          level:level, topic:topic, skill:topic, imported:true,
+          needKey:(q.ans===null||q.ans===undefined), ind:q.ind||'', source:q.file||'' },
+      meta:{ level:level, imported:true, source:q.file||'' } };
+  });
+  const blob = new Blob([JSON.stringify({v:9, db:{doc:{},exam:{},item:item,book:{},lib:{}}, meta:{savedUSD:0}}, null, 1)],
+    {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'samath-items-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('ได้ไฟล์สำรอง ' + Object.keys(item).length + ' ข้อ');
 }
 
 /* ── หน้าจอคลังความรู้ ─────────────────────────────────────────────── */
@@ -9874,7 +10216,8 @@ function installFonts(){
    ════════════════════════════════════════════════════════════════════ */
 
 const PAGE_TITLE = {dash:'หน้าหลัก', book:'สตูดิโอหนังสือ', doc:'สร้างเอกสาร', exam:'สตูดิโอข้อสอบ',
-                    stu:'นักเรียน', lib:'คลังความรู้', repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
+                    stu:'นักเรียน', build:'สร้างคลังจากไฟล์', lib:'คลังความรู้',
+                    repo:'คลังกลาง', curr:'หลักสูตร', set:'ตั้งค่า'};
 
 /* ── ขนาดตัวอักษรทั้งโปรแกรม 90–140% เก็บค่าไว้ให้ครั้งหน้าเปิดมาเท่าเดิม ── */
 const ZOOM_STEPS = [90, 100, 110, 120, 130, 140];
@@ -9907,6 +10250,7 @@ function go(page){
   if(page==='dash') refreshDash();
   if(page==='stu')  initStuUI();
   if(page==='lib')  initLibUI();
+  if(page==='build') initBBUI();
   if(page==='repo') renderRepo();
   if(page==='curr') renderCurr();
   if(page==='set')  fillCfgForm();
@@ -11568,6 +11912,65 @@ ok('มีตัวเลือกแหล่งที่มาของข้�
   Array.from(d.getElementById('eSource').options).map(o=>o.value).join(',') === 'auto,bank,ai');
 ok('หมวดนำเข้าข้อสอบรายข้อบอกชัดว่าไม่เรียก AI',
   libCat('exam_import').name.indexOf('ไม่เรียก AI') >= 0);
+
+/* ══ 19. เมนูสร้างคลังจากไฟล์ (Bank Builder ในตัว) ══ */
+ok('มีเมนูสร้างคลังจากไฟล์และหน้าจอรองรับ',
+  !!d.querySelector('.rail-btn[data-page="build"]') && !!d.getElementById('pg-build') && !!PAGE_TITLE.build);
+ok('หน้าสร้างคลังมีกล่องลากไฟล์และปุ่มเลือกทั้งโฟลเดอร์',
+  !!d.getElementById('bbDrop') && d.getElementById('bbDir').hasAttribute('webkitdirectory'));
+(function(){
+  const _files = bbFiles.slice(), _items = bbItems.slice(), _db = JSON.parse(JSON.stringify(BANK.db.item||{}));
+  try{
+    initBBUI();
+    ok('เลือกชั้นแล้วรายการบทขึ้นตามหลักสูตร',
+      d.getElementById('bbTopic').options.length === CURRICULUM[d.getElementById('bbGrade').value].length + 1);
+    bbItems = [
+      {no:1, q:'โจทย์หนึ่งยาวพอสมควร', choices:['ก','ข','ค','ง'], ans:0, level:'ง่าย', grade:'ป.1', topic:'', ind:'', file:'a'},
+      {no:2, q:'โจทย์สองยาวพอสมควร', choices:['ก','ข','ค','ง'], ans:null, level:'ปานกลาง', grade:'ป.2', topic:'', ind:'', file:'a'},
+      {no:3, q:'โจทย์สามยาวพอสมควร', choices:['ก','ข','ค','ง'], ans:2, level:'ยาก', grade:'ป.3', topic:'', ind:'', file:'a'}
+    ];
+    bbPaintItems();
+    ok('ตารางแสดงครบทุกข้อพร้อมช่องติ๊ก',
+      d.querySelectorAll('#bbItems tbody tr').length === 3 &&
+      d.querySelectorAll('#bbItems tbody input[type=checkbox]').length === 3);
+    ok('มีช่องแก้ชั้นรายข้อ', d.querySelectorAll('#bbItems tbody tr td:nth-child(5) select').length === 3);
+    bbSelectAll(false);
+    ok('เริ่มต้นไม่มีข้อใดถูกเลือก', bbSelCount() === 0);
+    bbSelectOne(0, true, null); bbSelectOne(2, true, {shiftKey:true});
+    ok('กด Shift แล้วคลิกเลือกได้ทั้งช่วง', bbSelCount() === 3);
+    bbSelectBy('nokey');
+    ok('เลือกเฉพาะข้อที่ยังไม่มีเฉลย', bbSelCount() === 1 && bbItems[1].sel);
+    d.getElementById('bbGrade').value = 'ม.2'; bbApply('grade');
+    ok('ตั้งชั้นเฉพาะข้อที่เลือก', bbItems[1].grade === 'ม.2' && bbItems[0].grade === 'ป.1');
+    d.getElementById('bbLevel').value = 'ยาก'; bbApply('level');
+    ok('ตั้งระดับเฉพาะข้อที่เลือก', bbItems[1].level === 'ยาก' && bbItems[0].level === 'ง่าย');
+    /* บันทึกเข้าคลังจริง แล้วต้องหยิบไปออกข้อสอบได้ */
+    const before = BANK.count('item');
+    bbSelectAll(false); bbSelectOne(0, true, null);
+    d.getElementById('bbGrade').value = 'ป.1';
+    bbOnGrade(); d.getElementById('bbTopic').value = '';
+    d.getElementById('bbShare').value = '0';
+    const q0 = bbItems[0];
+    bbSave(true);
+    ok('เก็บเฉพาะข้อที่เลือกเข้าคลังรายข้อได้', BANK.count('item') === before + 1);
+    ok('ข้อที่เก็บใช้ชั้นรายข้อ ไม่ใช่ค่ารวมอย่างเดียว',
+      BANK.all('item').some(r=>r.grade === q0.grade && r.q && r.q.q === q0.q));
+    ok('ข้อที่นำเข้าถูกทำเครื่องหมายว่ามาจากไฟล์',
+      BANK.all('item').some(r=>r.q && r.q.imported === true));
+    const rec = BANK.all('item').find(r=>r.q && r.q.q === q0.q);
+    ok('ถังของข้อตรงรูปแบบที่ตัวออกข้อสอบใช้',
+      rec.bucket === BANK.itemKeyOf(q0.grade, '', '', q0.level), rec.bucket);
+    ok('หยิบข้อจากคลังไปประกอบข้อสอบได้จริง',
+      BANK.takeItems(rec.bucket, 1, new Set()).length === 1);
+    bbSelectAll(true); bbKeepSelected();
+    ok('เก็บเฉพาะที่เลือกได้', bbItems.length === 3);
+    bbSelectAll(true); bbDropSelected();
+    ok('ลบที่เลือกออกได้หมด', bbItems.length === 0);
+    ok('ไม่ได้เลือกอะไรแล้วสั่งทำต้องไม่พัง',
+      (function(){ try{ bbApply('grade'); bbDropSelected(); bbSave(true); return true; }catch(e){ return false; } })());
+  } catch(err){ ok('เทสต์เมนูสร้างคลังทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally { bbFiles = _files; bbItems = _items; BANK.db.item = _db; BANK._save(); }
+})();
 
 /* ══ 17. โครงแผนการสอน AL / GPAS 5 Steps ══ */
     ok('มีขั้น GPAS ครบ 5 ขั้นตามลำดับ',
