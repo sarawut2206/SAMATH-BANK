@@ -5558,7 +5558,7 @@ const modelById = id => MODELS.find(m=>m.id===id) || MODELS[0];
 /* ── CONFIG ─────────────────────────────────────────────────────── */
 const CFG_KEY = 'samath_studio_cfg_v9';
 const CFG_DEF = {
-  key:'', pass:'samath2569', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
+  key:'', pass:'', url:'https://script.google.com/macros/s/AKfycbz9mYblaEAT90WYwTHJuznpU41vuDc2AwaW49qjhKvEhf-TQhQwh70LKemu-GtogWoI/exec', model:MODELS[0].id, fresh:0.25, depth:12, rate:36,
   teacher:'', school:'', term:'', books:{}, layout:'compact', showLevel:true, zoom:100
 };
 let CFG = Object.assign({}, CFG_DEF);
@@ -5845,8 +5845,13 @@ const BANK = {
     });
     if(touched) this._save();
   },
+  /* ยังไม่ได้ใส่รหัสคลังกลาง = ยังตั้งค่าไม่เสร็จ ไม่ใช่ความผิดพลาด จึงพักคิวไว้เฉย ๆ */
+  needsPass(){ return this.ready() && !String(CFG.pass||'').trim(); },
+  authError(err){ return /รหัสผ่าน|password|ไม่ได้รับอนุญาต|unauthor/i.test(String(err||'')); },
   async flush(){
     if(!this.ready() || this._flushing) return {ok:false, busy:this._flushing};
+    if(this.needsPass()) return {ok:false, needsPass:true, sent:0};
+    if(this._paused) return {ok:false, paused:true, sent:0};
     if(!this._outLoad().length) return {ok:true, sent:0};
     this._flushing = true; this.notify();
     let sent = 0, err = '';
@@ -5859,7 +5864,12 @@ const BANK = {
         if(!r.ok && /ไม่รู้จักคำสั่ง/.test(r.error||'')){
           r = await this._flushOneByOne(chunk);
         }
-        if(!r.ok){ err = r.error || 'ไม่ทราบสาเหตุ'; break; }
+        if(!r.ok){
+          err = r.error || 'ไม่ทราบสาเหตุ';
+          /* รหัสไม่ตรงกับชีต ลองกี่ครั้งก็ไม่ผ่าน หยุดไว้ก่อนแล้วบอกให้ไปแก้ที่หน้าตั้งค่า */
+          if(this.authError(err)){ this._paused = true; }
+          break;
+        }
         /* ชีตรับชุดนี้แล้ว แต่มีบางชิ้นที่ชีตยังไม่มีที่เก็บให้ (โค้ดชีตเก่ากว่าโปรแกรม) */
         if(Array.isArray(r.errors) && r.errors.some(e=>this.unknownKind(e)) && !this._warnedKind){
           this._warnedKind = true;
@@ -9939,12 +9949,25 @@ function renderSys(){
     Object.values(CURRICULUM).reduce((a,b)=>a+b.reduce((x,t)=>x+t.subs.length,0),0)+' หัวข้อย่อย']]);
   const warn = document.getElementById('dashWarn');
   if(warn){
-    warn.innerHTML = BANK.ready() ? '' :
-      `<div class="note err" style="margin-bottom:14px">
-         <b>ยังไม่ได้เชื่อมคลังกลาง</b> — ตอนนี้ทุกอย่างเก็บอยู่ในเครื่องนี้เท่านั้น
-         ถ้าย้ายไฟล์ ล้างข้อมูลเบราว์เซอร์ หรือเปลี่ยนเครื่อง จะหายทั้งหมด
-         <br><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="go('set')">ไปหน้าตั้งค่า</button>
-       </div>`;
+    warn.innerHTML = !BANK.ready()
+      ? `<div class="note warn" style="margin-bottom:14px">
+           <b>ยังไม่ได้เชื่อมคลังกลาง</b> — ตอนนี้ทุกอย่างเก็บอยู่ในเครื่องนี้เท่านั้น
+           ถ้าย้ายไฟล์ ล้างข้อมูลเบราว์เซอร์ หรือเปลี่ยนเครื่อง จะหายทั้งหมด
+           <br><button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="go('set')">ไปหน้าตั้งค่า</button>
+         </div>`
+      : (BANK.needsPass()
+        ? `<div class="note warn" style="margin-bottom:14px">
+             <b>เหลืออีกขั้นเดียว — ใส่รหัสคลังกลาง</b> มีที่อยู่ของคลังแล้ว แต่ยังไม่ได้ใส่รหัส
+             ระหว่างนี้งานทุกชิ้นถูกเก็บไว้ในเครื่องและรอส่งขึ้นคลังให้เองเมื่อใส่รหัสแล้ว
+             <br><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="go('set')">ใส่รหัสตอนนี้</button>
+           </div>`
+        : (BANK._paused
+          ? `<div class="note warn" style="margin-bottom:14px">
+               <b>รหัสคลังกลางไม่ตรงกับชีต</b> — พักการส่งไว้ก่อนเพื่อไม่ให้ลองซ้ำจนรบกวน
+               ตรวจว่ารหัสในหน้าตั้งค่าตรงกับ BANK_PASSWORD ใน Apps Script แล้วกดบันทึกอีกครั้ง
+               <br><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="go('set')">ไปแก้รหัส</button>
+             </div>`
+          : ''));
   }
   document.getElementById('sysStatus').innerHTML =
     `<table class="tbl"><tbody>` + rows.map(r=>
@@ -10070,6 +10093,10 @@ function syncOK(msg){
 }
 async function syncPush(force){
   if(!BANK.ready()){ toast('ยังไม่ได้ตั้งค่า Google Sheets'); go('set'); return; }
+  if(BANK.needsPass()){
+    syncOK('ยังไม่ได้ใส่รหัสคลังกลาง — ใส่รหัสในหน้าตั้งค่าก่อน แล้วของที่รออยู่จะถูกส่งขึ้นให้เอง');
+    toast('ยังไม่ได้ใส่รหัสคลังกลาง'); go('set'); return;
+  }
   const n = BANK.enqueueUnsynced(force===true);
   const pending = BANK.outCount();
   if(!pending){ syncOK('ของในเครื่องขึ้นชีตครบแล้วทุกชิ้น'); toast('ไม่มีอะไรค้างส่ง'); return; }
@@ -10204,6 +10231,7 @@ function fillCfgForm(){
   chip.textContent = BANK.ready() ? 'เชื่อมต่อแล้ว' : 'ยังไม่ได้ตั้งค่า';
 }
 function saveCfg(){
+  BANK._paused = false;                       /* แก้ค่าตั้งค่าแล้ว ให้คิวกลับมาทำงานอีกครั้ง */
   CFG.url = (document.getElementById('cfgUrl').value||'').trim();
   CFG.pass = document.getElementById('cfgPass').value||'';
   CFG.key = (document.getElementById('cfgKey').value||'').trim();
@@ -11671,6 +11699,13 @@ ok('หนังสือถูกแปลงกลับจากแถวใ�
     return !!r && r.html.indexOf('บท') >= 0; })());
 ok('แถวหนังสือที่เนื้อหาว่างถูกทิ้ง',
   normRec({key:'b2', kind:'book', title:'ว', payload:'', ts:Date.now()}) === null);
+ok('ยังไม่ใส่รหัสคลังกลาง = พักคิวไว้ ไม่นับเป็นความผิดพลาด',
+  (function(){ const _p = CFG.pass; CFG.pass = ''; const need = BANK.needsPass(); CFG.pass = _p;
+    return need === true || !BANK.ready(); })());
+ok('ใส่รหัสแล้วคิวกลับมาทำงาน',
+  (function(){ const _p = CFG.pass; CFG.pass = 'x'; const need = BANK.needsPass(); CFG.pass = _p; return need === false; })());
+ok('รู้จักข้อความว่ารหัสไม่ตรง เพื่อพักคิวแทนการลองซ้ำไม่รู้จบ',
+  BANK.authError('รหัสผ่านไม่ถูกต้อง') && !BANK.authError('ระบบกำลังเขียนอยู่'));
 ok('รู้จักข้อความที่ชีตบอกว่ายังไม่มีที่เก็บชนิดนี้',
   BANK.unknownKind('ชนิดข้อมูลไม่ถูกต้อง: book') && BANK.unknownKind('ไม่พบชีต BookBank') &&
   !BANK.unknownKind('ระบบกำลังเขียนอยู่ ลองใหม่'));
@@ -11919,8 +11954,11 @@ ok('คลังกลางมีตัวกรองหนังสือใ�
 
     /* ══ 10. ส่งขึ้นชีตทั้งกระบวนการ (ใช้ตัวส่งจำลอง ไม่แตะเน็ตจริง) ══ */
     const realPost = BANK.post;
+    const _pass = CFG.pass, _paused = BANK._paused;
     let calls = [];
     try{
+      CFG.pass = _pass || 'ทดสอบรหัส';     /* คิวจะพักไว้ถ้ายังไม่ได้ใส่รหัส จึงต้องใส่ก่อนทดสอบ */
+      BANK._paused = false;
       if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }
       BANK._flushing = false;
       BANK.post = async function(body){ calls.push(body); return {ok:true}; };
@@ -11951,7 +11989,7 @@ ok('คลังกลางมีตัวกรองหนังสือใ�
       ok('ตั้งเวลาลองส่งใหม่ให้เองอัตโนมัติ', BANK._wait > 0);
       if(BANK._timer){ clearTimeout(BANK._timer); BANK._timer = null; }
       BANK._wait = 0;
-    } finally { BANK.post = realPost; }
+    } finally { BANK.post = realPost; CFG.pass = _pass; BANK._paused = _paused; }
   } catch(err){ ok('เทสต์คิวทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally{
     BANK.ready = _ready; BANK.out = _out; BANK._outSave();
