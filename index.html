@@ -6079,6 +6079,59 @@ const BANK = {
     this._save();
     return out;
   },
+  /* วินิจฉัยการเชื่อมต่อทีละขั้น แล้วบอกสาเหตุจริง ไม่ใช่ไล่ให้เดาเอง
+     คืน {step, ok, cause, fix, detail} */
+  async diagnose(){
+    const url = String(CFG.url||'').trim();
+    if(!url) return {step:'url', ok:false, cause:'ยังไม่ได้ใส่ Web App URL',
+      fix:'คัดลอก URL จาก Apps Script → ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ มาวางในช่องด้านบน'};
+    if(url.indexOf('script.google.com') < 0)
+      return {step:'url', ok:false, cause:'URL ไม่ใช่ของ Apps Script',
+        fix:'ต้องเป็นลิงก์ที่ขึ้นต้นด้วย https://script.google.com/macros/s/…'};
+    if(!/\/exec\s*$/.test(url))
+      return {step:'url', ok:false, cause:'URL ไม่ได้ลงท้ายด้วย /exec',
+        fix: /\/dev\s*$/.test(url)
+          ? 'ตอนนี้เป็นลิงก์ /dev ซึ่งใช้ได้เฉพาะเจ้าของขณะเปิดหน้าแก้ไข ให้ใช้ลิงก์ /exec จากหน้า จัดการการทำให้ใช้งานได้ แทน'
+          : 'ลิงก์ที่ถูกต้องต้องลงท้ายด้วย /exec'};
+
+    let res, txt;
+    try{
+      res = await fetch(url + '?action=ping&password=' + encodeURIComponent(CFG.pass||''));
+      txt = await res.text();
+    }catch(e){
+      return {step:'net', ok:false, cause:'ติดต่อ Google ไม่ได้',
+        fix:'ตรวจอินเทอร์เน็ต หรือถ้าเปิดไฟล์ผ่านโปรแกรมที่บล็อกการเชื่อมต่อ ให้ลองเปิดในเบราว์เซอร์ปกติ',
+        detail:String(e && e.message || e)};
+    }
+    if(!res.ok && res.status !== 200)
+      return {step:'http', ok:false, cause:'Google ตอบกลับมาเป็นข้อผิดพลาด HTTP ' + res.status,
+        fix: res.status === 404
+          ? 'ไม่พบ deployment นี้แล้ว ให้ Deploy ใหม่แล้วนำ URL ใหม่มาวาง'
+          : 'ลองใหม่อีกครั้ง ถ้ายังไม่หายให้ Deploy เวอร์ชันใหม่',
+        detail: (txt||'').slice(0,140)};
+
+    let d = null;
+    try{ d = JSON.parse(txt); }catch(e){}
+    if(!d){
+      const t = String(txt||'');
+      if(/does not exist|ไม่พบไฟล์/i.test(t))
+        return {step:'deploy', ok:false, cause:'deployment ถูกลบไปแล้ว หรือ URL ผิด',
+          fix:'เปิด Apps Script → ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ แล้วคัดลอก URL ที่ลงท้าย /exec มาวางใหม่'};
+      if(/accounts\.google|Sign in|ลงชื่อเข้าใช้|Google Account/i.test(t))
+        return {step:'access', ok:false, cause:'Google ขอให้ล็อกอินก่อน แปลว่ายังไม่ได้เปิดให้ทุกคนเข้าถึง',
+          fix:'ตอน Deploy ให้ตั้ง "ผู้ที่มีสิทธิ์เข้าถึง" เป็น ทุกคน (Anyone) แล้วทำให้ใช้งานได้ใหม่เป็นเวอร์ชันใหม่'};
+      return {step:'format', ok:false, cause:'ชีตตอบกลับมาไม่ใช่ JSON',
+        fix:'มักเกิดจากโค้ดในสคริปต์มีข้อผิดพลาด ลองรัน selfTest ใน Apps Script ดูข้อความที่ฟ้อง',
+        detail:t.slice(0,140).replace(/<[^>]+>/g,' ')};
+    }
+    if(d.ok === false && /รหัสผ่าน|password/i.test(String(d.error||'')))
+      return {step:'pass', ok:false, cause:'รหัสผ่านไม่ตรงกับที่ตั้งไว้ในสคริปต์',
+        fix:'เปิด Apps Script ดูบรรทัด BANK_PASSWORD แล้วใส่ให้ตรงกันในช่องด้านบน (ตัวพิมพ์เล็กใหญ่ต้องตรง)'};
+    if(d.ok === false)
+      return {step:'script', ok:false, cause:'สคริปต์ตอบว่ามีข้อผิดพลาด',
+        fix:'ลองรัน setup แล้วตามด้วย selfTest ใน Apps Script', detail:String(d.error||'')};
+    return {step:'ok', ok:true, version: d.version || '—'};
+  },
   async stats(){
     if(!this.ready()) return null;
     try{
@@ -10752,8 +10805,15 @@ function forgetKey(){
 async function testSheets(){
   const box = document.getElementById('sheetTest');
   saveCfg();
-  if(!BANK.ready()){ box.innerHTML = `<div class="note err">ยังไม่ได้ใส่ Web App URL หรือ URL ไม่ถูกต้อง</div>`; return; }
   box.innerHTML = `<div class="note info">กำลังทดสอบ…</div>`;
+  /* วินิจฉัยก่อน เพื่อบอกสาเหตุจริงเมื่อเชื่อมต่อไม่ได้ */
+  const dg = await BANK.diagnose();
+  if(!dg.ok){
+    box.innerHTML = `<div class="note err"><b>เชื่อมต่อไม่สำเร็จ — ${esc(dg.cause)}</b>
+      <br><b>วิธีแก้:</b> ${esc(dg.fix)}
+      ${dg.detail ? '<br><span class="small mut">ข้อความจากระบบ: ' + esc(dg.detail) + '</span>' : ''}</div>`;
+    return;
+  }
   const s = await BANK.stats();
   if(s){
     /* อ่านได้แล้วยังไม่พอ ต้องพิสูจน์ว่า "เขียนได้" ด้วย เพราะที่ผ่านมาการเขียนล้มเงียบ */
@@ -10763,9 +10823,13 @@ async function testSheets(){
       payload:'<p>ทดสอบการเขียนจากโปรแกรม</p>', meta:'{}', password: CFG.pass||'' });
     if(w.ok){
       BANK.post({ action:'del', kind:'doc', key:probeKey, password: CFG.pass||'' });
-      box.innerHTML = `<div class="note info"><b>เชื่อมต่อสำเร็จ · อ่านได้ · เขียนได้</b><br>
+      const ver = String(s.version || dg.version || '—');
+      const old = /bank-1\.[012]/.test(ver);
+      box.innerHTML = `<div class="note ${old?'warn':'info'}"><b>เชื่อมต่อสำเร็จ · อ่านได้ · เขียนได้</b><br>
         คลังกลางมี เอกสาร ${s.doc||0} ชิ้น · ชุดข้อสอบ ${s.exam||0} ชุด · ข้อสอบรายข้อ ${s.item||0} ข้อ<br>
-        เวอร์ชัน Apps Script: ${esc(s.version||'—')}</div>`;
+        เวอร์ชัน Apps Script: ${esc(ver)}
+        ${old ? '<br><b>โค้ดในชีตเก่ากว่าโปรแกรม</b> — หนังสือและคลังความรู้จะยังไม่ถูกเก็บขึ้นชีต '
+              + 'ให้วางไฟล์ samath-bank.gs ตัวล่าสุด แล้วรัน setup อีกครั้งและทำให้ใช้งานได้เป็นเวอร์ชันใหม่' : ''}</div>`;
     } else {
       box.innerHTML = `<div class="note err"><b>อ่านได้ แต่เขียนไม่ได้</b><br>
         สาเหตุ: ${esc(w.error||'')}<br>
@@ -10774,9 +10838,9 @@ async function testSheets(){
     }
     refreshDash();
   } else {
-    box.innerHTML = `<div class="note err"><b>เชื่อมต่อไม่สำเร็จ</b><br>
-      ตรวจสอบว่า (1) Deploy เป็น Web app แล้ว (2) ตั้ง “Who has access” เป็น <b>Anyone</b>
-      (3) URL ลงท้ายด้วย <b>/exec</b> (4) รหัสผ่านตรงกับ BANK_PASSWORD ในสคริปต์</div>`;
+    box.innerHTML = `<div class="note err"><b>ตอบสนองได้ แต่ขอสถิติไม่สำเร็จ</b><br>
+      สคริปต์ทำงานอยู่ (เวอร์ชัน ${esc(dg.version||'—')}) แต่คำสั่ง stats ล้มเหลว
+      มักเกิดจากยังไม่ได้รัน <b>setup</b> ในสคริปต์ ทำให้ยังไม่มีชีตปลายทาง</div>`;
   }
 }
 
@@ -12123,6 +12187,59 @@ await (async function(){
     ok('ยังไม่ใส่ API Key ต้องบอกให้ไปใส่ก่อน ไม่ใช่เงียบ', bbItems.length === 0);
   } catch(err){ ok('เทสต์โหมด AI อ่านหน้าสแกนทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally { bbFiles = _files; bbItems = _items; window.callAI = _ai; window.confirm = _cf; CFG.key = _key; }
+})();
+
+/* ══ 20. วินิจฉัยการเชื่อมต่อคลังกลาง — ต้องบอกสาเหตุจริง ไม่ใช่ให้เดาเอง ══ */
+await (async function(){
+  const _url = CFG.url, _pass = CFG.pass, _fetch = window.fetch;
+  const mock = (txt, status) => { window.fetch = async ()=>({ ok:(status||200)===200, status:status||200, text: async()=>txt }); };
+  try{
+    CFG.url = ''; 
+    ok('ยังไม่ใส่ URL → บอกให้ไปคัดลอกมาวาง',
+      (await BANK.diagnose()).cause.indexOf('ยังไม่ได้ใส่') >= 0);
+    CFG.url = 'https://example.com/exec';
+    ok('URL ไม่ใช่ของ Apps Script → บอกชัด',
+      (await BANK.diagnose()).cause.indexOf('ไม่ใช่ของ Apps Script') >= 0);
+    CFG.url = 'https://script.google.com/macros/s/AAA/dev';
+    (function(){ }());
+    const dv = await BANK.diagnose();
+    ok('ใช้ลิงก์ /dev → เตือนว่าต้องใช้ /exec',
+      dv.cause.indexOf('/exec') >= 0 && dv.fix.indexOf('/dev') >= 0, dv.cause);
+    CFG.url = 'https://script.google.com/macros/s/AAA/exec';
+    CFG.pass = 'x';
+    window.fetch = async ()=>{ throw new Error('Failed to fetch'); };
+    ok('เน็ตล่ม → บอกว่าติดต่อ Google ไม่ได้',
+      (await BANK.diagnose()).cause.indexOf('ติดต่อ Google ไม่ได้') >= 0);
+    mock('<html>Sorry, the file you have requested does not exist</html>');
+    const d1 = await BANK.diagnose();
+    ok('deployment ถูกลบ → บอกให้ Deploy ใหม่แล้วเอา URL ใหม่มาวาง',
+      d1.cause.indexOf('deployment') >= 0 && d1.fix.indexOf('/exec') >= 0, d1.cause);
+    mock('<html><title>Sign in - Google Accounts</title></html>');
+    const d2 = await BANK.diagnose();
+    ok('Google ขอล็อกอิน → บอกให้ตั้งสิทธิ์เป็นทุกคน',
+      d2.cause.indexOf('ล็อกอิน') >= 0 && d2.fix.indexOf('ทุกคน') >= 0, d2.cause);
+    mock(JSON.stringify({ok:false, error:'รหัสผ่านไม่ถูกต้อง'}));
+    const d3 = await BANK.diagnose();
+    ok('รหัสผ่านผิด → ชี้ไปที่ BANK_PASSWORD โดยตรง',
+      d3.step === 'pass' && d3.fix.indexOf('BANK_PASSWORD') >= 0, d3.cause);
+    mock(JSON.stringify({ok:false, error:'ไม่พบชีต DocBank'}));
+    const d4 = await BANK.diagnose();
+    ok('สคริปต์ฟ้องข้อผิดพลาดอื่น → บอกให้รัน setup',
+      d4.step === 'script' && d4.fix.indexOf('setup') >= 0, d4.cause);
+    mock('ไม่ใช่ JSON เลย');
+    ok('ชีตตอบไม่ใช่ JSON → บอกให้ไปรัน selfTest',
+      (await BANK.diagnose()).fix.indexOf('selfTest') >= 0);
+    mock('{}', 404);
+    const d5 = await BANK.diagnose();
+    ok('HTTP 404 → บอกว่าไม่พบ deployment', d5.cause.indexOf('404') >= 0);
+    mock(JSON.stringify({ok:true, version:'bank-1.3'}));
+    const d6 = await BANK.diagnose();
+    ok('ทุกอย่างถูกต้อง → ผ่านและบอกเวอร์ชันของสคริปต์',
+      d6.ok === true && d6.version === 'bank-1.3');
+    ok('ทุกกรณีที่ไม่ผ่านต้องมีทั้งสาเหตุและวิธีแก้',
+      [d1,d2,d3,d4,d5].every(x=>!x.ok && x.cause && x.fix));
+  } catch(err){ ok('เทสต์ตัววินิจฉัยทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally { CFG.url = _url; CFG.pass = _pass; window.fetch = _fetch; }
 })();
 
 /* ══ 17. โครงแผนการสอน AL / GPAS 5 Steps ══ */
