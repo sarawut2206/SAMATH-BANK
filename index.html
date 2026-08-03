@@ -1097,7 +1097,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                      ondragover="bbDragOver(event)" ondragleave="bbDragOut()">
                   <div class="dz-ico">⇪</div>
                   <div class="dz-t">ลากไฟล์หรือทั้งโฟลเดอร์มาวางตรงนี้</div>
-                  <div class="dz-d">PDF · Word · ebook · สไลด์ · ไฟล์ข้อความ — ไฟล์ที่เป็นภาพสแกนให้ใช้คลังความรู้แทน</div>
+                  <div class="dz-d">PDF · Word · ebook · สไลด์ · รูปถ่าย · ไฟล์ข้อความ — ไฟล์ที่เป็นภาพสแกนก็อ่านได้ด้วยโหมด AI</div>
                 </div>
                 <input type="file" id="bbFile" multiple style="display:none" onchange="bbTake(this.files)">
                 <input type="file" id="bbDir" multiple webkitdirectory directory style="display:none" onchange="bbTake(this.files)">
@@ -1120,6 +1120,12 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                 </div>
                 <div class="fld"><label for="bbTopic">บทเรียน</label><select id="bbTopic"></select></div>
                 <button class="btn btn-primary w100" id="bbGo" onclick="bbParse()" disabled>แยกข้อสอบจากไฟล์ (ไม่ใช้ AI)</button>
+                <button class="btn btn-ghost w100 mt10" id="bbGoAI" onclick="bbParseAI()" disabled>
+                  ให้ AI อ่านหน้าสแกน (มีค่าใช้จ่าย)</button>
+                <div class="prog" id="bbProg" style="display:none">
+                  <div class="prog-bar"><div class="prog-fill" id="bbProgFill"></div></div>
+                  <div class="prog-txt" id="bbProgTxt">กำลังให้ AI อ่าน…</div>
+                </div>
                 <div class="note info mt10">ถ้าโจทย์มีวงเล็บรหัสตัวชี้วัดกำกับ เช่น (ค 1.1 ป.5/1) ระบบจะจัดชั้นให้เองรายข้อ อัปโหลดเล่มรวมหลายชั้นทีเดียวได้</div>
               </div>
             </div>
@@ -1150,6 +1156,7 @@ window.MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$
                   <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('grade')">ชั้นที่เลือกทางซ้าย</button>
                   <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('notopic')">ที่ยังไม่ระบุบท</button>
                   <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('short')">ที่น่าจะแยกเพี้ยน</button>
+                  <button class="btn btn-ghost btn-sm" onclick="bbSelectBy('img')">ที่ตัวเลือกเป็นรูป</button>
                 </div>
                 <div class="pkbar">
                   <b class="small">ทำกับที่เลือก:</b>
@@ -9074,7 +9081,8 @@ function stripTags(s){
 }
 /* หน้าที่ตัวอักษรน้อยแปลว่าเป็นหน้าสแกน ต้องส่งเป็นรูปให้ AI อ่านแทน */
 const SCAN_MIN_CHARS = 60;
-const MAX_VISION_PAGES = 12;
+const MAX_VISION_PAGES = 60;      /* เก็บภาพหน้าสแกนไว้ได้ถึงเท่านี้ */
+const VISION_PER_CALL  = 4;       /* ส่งให้ AI อ่านทีละกี่หน้า */
 
 async function extractFile(file, onProg){
   const kind = fileKind(file);
@@ -9488,7 +9496,7 @@ async function bbTake(list){
     try{
       row.data = await extractFile(f, (i,n,msg)=>{ row.state = msg || ('อ่านหน้า ' + i + '/' + n); bbPaintFiles(); });
       row.state = row.data.scanned
-        ? ('เป็นหน้าสแกน ' + row.data.images.length + ' หน้า — ใช้คลังความรู้ (โหมด AI) แทน')
+        ? ('เป็นหน้าสแกน ' + row.data.images.length + ' หน้า — กดปุ่มให้ AI อ่านหน้าสแกนด้านล่าง')
         : ('อ่านข้อความได้ ' + row.data.text.length.toLocaleString() + ' ตัวอักษร');
     }catch(e){ row.err = e.message; row.state = 'อ่านไม่สำเร็จ'; }
     bbPaintFiles();
@@ -9510,6 +9518,14 @@ function bbPaintFiles(){
         <span class="on-b"><button class="btn btn-ghost btn-sm" onclick="bbDropFile(${f.idx})">✕</button></span>
       </div>`).join('')).join('');
   document.getElementById('bbGo').disabled = !bbFiles.some(f=>f.data && !f.err && (f.data.text||'').length > 40);
+  const ai = document.getElementById('bbGoAI');
+  if(ai){
+    const pages = bbScanPages();
+    ai.disabled = !pages;
+    ai.textContent = pages
+      ? ('ให้ AI อ่านหน้าสแกน ' + pages + ' หน้า (มีค่าใช้จ่าย)')
+      : 'ให้ AI อ่านหน้าสแกน (ไม่มีหน้าสแกนในไฟล์นี้)';
+  }
 }
 function bbDropFile(i){ bbFiles.splice(i,1); bbPaintFiles(); }
 function bbClear(){ bbFiles = []; bbItems = []; bbLastSel = -1; bbPaintFiles(); bbPaintItems(); }
@@ -9533,6 +9549,88 @@ function bbParse(){
   bbItems = bbItems.concat(got);
   bbPaintItems();
   toast('แยกได้ ' + got.length + ' ข้อ (รวม ' + bbItems.length + ' ข้อ) โดยไม่เสียค่า AI');
+}
+/* ══ หน้าสแกนไม่มีข้อความให้แยก จึงให้ AI อ่านจากภาพแทน ══
+   ส่งทีละไม่กี่หน้าเพื่อคุมขนาดคำขอ และบอกค่าใช้จ่ายให้ทราบก่อนเสมอ */
+function bbScanPages(){
+  let n = 0;
+  bbFiles.filter(f=>f.data && !f.err).forEach(f=>{ n += (f.data.images||[]).length; });
+  return n;
+}
+function bbAIPrompt(){
+  return `คุณคือผู้ช่วยถอดข้อสอบคณิตศาสตร์ไทยจากภาพหน้ากระดาษที่สแกนมา
+
+งาน: อ่านทุกข้อในภาพที่แนบมา แล้วถอดออกมาเป็น JSON ของข้อสอบ
+
+กติกาที่ห้ามผิด
+• ถอดตามที่เห็นในภาพเท่านั้น ห้ามแต่งโจทย์ใหม่ ห้ามเดาตัวเลข ห้ามเติมข้อที่ไม่มีในภาพ
+• อ่านไม่ออกหรือภาพไม่ชัดตรงไหน ให้ข้ามข้อนั้นไป ดีกว่าถอดผิด
+• ตัวเลือกที่เป็นรูปภาพ (เช่น ให้เลือกรูปสี่เหลี่ยม) ให้เขียนว่า "[รูปภาพ]" แล้วใส่ "img": true ในข้อนั้น
+• สูตรหรือนิพจน์คณิตศาสตร์ให้เขียนด้วย LaTeX คร่อมด้วย $ … $
+• ถ้าท้ายโจทย์มีวงเล็บรหัสตัวชี้วัด เช่น (ค 1.1 ป.5/1) ให้แยกไปใส่ช่อง ind และตัดออกจากโจทย์
+• ถ้าในภาพมีเฉลยบอกไว้ ให้ใส่ ans เป็นเลขลำดับตัวเลือกที่ถูก เริ่มนับจาก 0 ถ้าไม่มีให้ใส่ null
+• ห้ามใส่ข้อความอื่นนอกเหนือจาก JSON
+
+ตอบเป็น JSON array อย่างเดียว รูปแบบนี้
+[{"no":1,"q":"ข้อความโจทย์","choices":["ตัวเลือก 1","ตัวเลือก 2","ตัวเลือก 3","ตัวเลือก 4"],"ans":null,"ind":"ค 1.1 ป.5/1","img":false}]`;
+}
+async function bbParseAI(){
+  const files = bbFiles.filter(f=>f.data && !f.err && (f.data.images||[]).length);
+  if(!files.length){ toast('ไม่มีหน้าสแกนในไฟล์ที่ใส่ไว้ — ถ้าไฟล์มีข้อความอยู่แล้วให้ใช้ปุ่มแยกแบบไม่ใช้ AI'); return; }
+  if(!CFG.key || CFG.key.length < 20){ toast('ต้องใส่ API Key ก่อนจึงจะให้ AI อ่านหน้าสแกนได้'); go('set'); return; }
+  const pages = bbScanPages();
+  const calls = Math.ceil(pages / VISION_PER_CALL);
+  const m = modelById(CFG.model);
+  const est = calls * (2600/1e6*m.in + 3000/1e6*m.out) + pages * (1500/1e6*m.in);
+  if(!confirm('หน้าสแกนทั้งหมด ' + pages + ' หน้า จะให้ AI อ่าน ' + calls + ' รอบ\n'
+      + 'ประมาณการค่าใช้จ่าย ' + thbFmt(est) + '\n\nดำเนินการต่อหรือไม่')) return;
+
+  const g = document.getElementById('bbGrade').value;
+  const topic = document.getElementById('bbTopic').value;
+  const level = document.getElementById('bbLevel').value;
+  const prog = document.getElementById('bbProg');
+  prog.style.display = 'block';
+  let done = 0, got = [], errs = [];
+  try{
+    for(const f of files){
+      const imgs = f.data.images;
+      for(let i=0;i<imgs.length;i+=VISION_PER_CALL){
+        const chunk = imgs.slice(i, i+VISION_PER_CALL);
+        done++;
+        document.getElementById('bbProgFill').style.width = Math.round(done/calls*100) + '%';
+        document.getElementById('bbProgTxt').textContent =
+          'AI กำลังอ่าน ' + f.name + ' หน้า ' + (i+1) + '–' + Math.min(i+VISION_PER_CALL, imgs.length)
+          + ' (รอบที่ ' + done + '/' + calls + ')';
+        try{
+          const res = await callAI(bbAIPrompt(), { model: CFG.model, maxTok: 4000, images: chunk, json: true });
+          const arr = safeJSON(res.text);
+          (Array.isArray(arr) ? arr : [arr]).forEach(q=>{
+            if(!q || !q.q || !Array.isArray(q.choices) || q.choices.length < 2) return;
+            const ind = String(q.ind || '').trim();
+            got.push({
+              no: +q.no || (got.length + 1),
+              q: String(q.q).trim(),
+              choices: q.choices.map(c=>String(c).trim()),
+              ans: (q.ans === null || q.ans === undefined) ? null : +q.ans,
+              ind: ind, img: !!q.img,
+              level: level, grade: gradeFromInd(ind) || g, topic: topic, sub:'',
+              file: f.name + ' (AI อ่านจากภาพ)'
+            });
+          });
+        }catch(e){ errs.push(f.name + ' หน้า ' + (i+1) + ': ' + e.message); }
+      }
+    }
+  } finally {
+    prog.style.display = 'none';
+  }
+  if(!got.length){
+    toast('AI อ่านไม่ได้เลย' + (errs.length ? ' — ' + errs[0] : ''));
+    return;
+  }
+  bbItems = bbItems.concat(got);
+  bbPaintItems();
+  toast('AI ถอดจากหน้าสแกนได้ ' + got.length + ' ข้อ'
+    + (errs.length ? ' · มี ' + errs.length + ' รอบที่พลาด' : ''));
 }
 function bbSelCount(){ return bbItems.filter(q=>q.sel).length; }
 function bbPaintItems(){
@@ -9565,7 +9663,7 @@ function bbPaintItems(){
         <td><input type="checkbox"${q.sel?' checked':''} onchange="bbSelectOne(${i}, this.checked, event)"></td>
         <td>${q.no || i+1}</td>
         <td class="sticky" style="text-align:left">${esc(q.q.slice(0,140))}${q.q.length>140?'…':''}
-          <br><span class="small mut">${q.ind?esc(q.ind)+' · ':''}${q.topic?esc(q.topic)+' · ':''}${esc(q.file||'')}</span></td>
+          <br><span class="small mut">${q.img?'<b style="color:var(--warn)">ตัวเลือกเป็นรูป</b> · ':''}${q.ind?esc(q.ind)+' · ':''}${q.topic?esc(q.topic)+' · ':''}${esc(q.file||'')}</span></td>
         <td style="text-align:left">${q.choices.map((c,k)=>`${BB_LT[k]}. ${esc(c.slice(0,30))}`).join('<br>')}</td>
         <td><select onchange="bbSetGrade(${i}, this.value)">
             ${GRADES.map(x=>`<option${q.grade===x?' selected':''}>${x}</option>`).join('')}</select></td>
@@ -9598,6 +9696,7 @@ function bbSelectBy(kind){
     else if(kind==='grade')   q.sel = (q.grade === g);
     else if(kind==='notopic') q.sel = !q.topic;
     else if(kind==='short')   q.sel = q.choices.some(c=>c.length < 2) || q.q.length < 15;
+    else if(kind==='img')     q.sel = !!q.img || q.choices.some(c=>/\[รูปภาพ\]/.test(c));
   });
   bbPaintItems();
   toast('เลือกไว้ ' + bbSelCount() + ' ข้อ');
@@ -10042,7 +10141,7 @@ function libJobs(){
       cur.names.push(f.name);
       if(t) cur.text += (cur.text ? '\n\n=== ' + f.name + ' ===\n' : '') + t.slice(0, LIB_JOB_CHARS);
       cur.chars = cur.text.length;
-      imgs.forEach(im=>{ if(cur.images.length < MAX_VISION_PAGES) cur.images.push(im); });
+      imgs.forEach(im=>{ if(cur.images.length < 12) cur.images.push(im); });
     });
   });
   return jobs;
@@ -10073,7 +10172,7 @@ async function libExtract(){
         + ' (' + (i+1) + '/' + jobs.length + ')';
       try{
         const res = await callAI(libPrompt(libKind, scope, f.text, !!f.images.length),
-          { model: CFG.model, maxTok: k.tok, images: f.images.slice(0, MAX_VISION_PAGES) });
+          { model: CFG.model, maxTok: k.tok, images: f.images.slice(0, 12) });
         const obj = safeJSON(res.text);
         const one = libClean(libKind, (Array.isArray(obj) ? obj[0] : obj) || {}, scope);
         merged.total += one.total;
@@ -11970,6 +12069,60 @@ ok('หน้าสร้างคลังมีกล่องลากไฟ�
       (function(){ try{ bbApply('grade'); bbDropSelected(); bbSave(true); return true; }catch(e){ return false; } })());
   } catch(err){ ok('เทสต์เมนูสร้างคลังทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
   finally { bbFiles = _files; bbItems = _items; BANK.db.item = _db; BANK._save(); }
+})();
+
+
+/* ── โหมด AI อ่านหน้าสแกน ── */
+ok('มีปุ่มให้ AI อ่านหน้าสแกน', !!d.getElementById('bbGoAI') && !!d.getElementById('bbProg'));
+ok('พรอมป์ตอ่านภาพห้ามแต่งโจทย์เอง',
+  bbAIPrompt().indexOf('ห้ามแต่งโจทย์ใหม่') >= 0 && bbAIPrompt().indexOf('ห้ามเดาตัวเลข') >= 0);
+ok('พรอมป์ตสั่งให้ข้ามข้อที่อ่านไม่ออก ดีกว่าถอดผิด',
+  bbAIPrompt().indexOf('ข้ามข้อนั้นไป') >= 0);
+ok('พรอมป์ตรองรับตัวเลือกที่เป็นรูปภาพ', bbAIPrompt().indexOf('[รูปภาพ]') >= 0);
+ok('พรอมป์ตให้แยกรหัสตัวชี้วัดออกมา', bbAIPrompt().indexOf('ind') >= 0);
+ok('ส่งภาพให้ AI ทีละไม่กี่หน้าเพื่อคุมขนาดคำขอ', VISION_PER_CALL >= 2 && VISION_PER_CALL <= 8);
+ok('เก็บภาพหน้าสแกนได้มากพอสำหรับทั้งเล่ม', MAX_VISION_PAGES >= 40);
+await (async function(){
+  const _files = bbFiles.slice(), _items = bbItems.slice(), _ai = window.callAI, _cf = window.confirm, _key = CFG.key;
+  try{
+    initBBUI();
+    bbFiles = [{ name:'สแกน.pdf', path:'สแกน.pdf', folder:'', state:'', err:'',
+      data:{ text:'', scanned:true, images:new Array(6).fill({media:'image/jpeg', data:'AAAA'}) } }];
+    bbItems = [];
+    bbPaintFiles();
+    ok('นับจำนวนหน้าสแกนได้ถูก', bbScanPages() === 6);
+    ok('ปุ่ม AI เปิดใช้งานเมื่อมีหน้าสแกน', d.getElementById('bbGoAI').disabled === false);
+    ok('ปุ่ม AI บอกจำนวนหน้าให้เห็นก่อนกด',
+      d.getElementById('bbGoAI').textContent.indexOf('6 หน้า') >= 0);
+    let calls = 0;
+    CFG.key = 'sk-ant-' + new Array(30).join('x');
+    window.confirm = ()=>true;
+    window.callAI = async function(){
+      calls++;
+      return { text: JSON.stringify([
+        { no:calls, q:'โจทย์จากภาพรอบที่ ' + calls, choices:['หนึ่ง','สอง','สาม','สี่'], ans:1, ind:'ค 1.1 ป.5/1', img:false },
+        { no:calls+100, q:'โจทย์รูปภาพรอบที่ ' + calls, choices:['[รูปภาพ]','[รูปภาพ]','[รูปภาพ]'], ans:null, ind:'', img:true }
+      ]), tin:10, tout:10 };
+    };
+    await bbParseAI();
+    ok('แบ่งส่งเป็นรอบตามจำนวนหน้า', calls === Math.ceil(6 / VISION_PER_CALL), calls + ' รอบ');
+    ok('ได้ข้อสอบจากหน้าสแกนครบทุกรอบ', bbItems.length === calls * 2, bbItems.length + '');
+    ok('ใช้รหัสตัวชี้วัดจากภาพจัดชั้นให้เอง', bbItems.some(q=>q.grade === 'ป.5'));
+    ok('ข้อที่ตัวเลือกเป็นรูปถูกทำเครื่องหมายไว้', bbItems.filter(q=>q.img).length === calls);
+    bbSelectBy('img');
+    ok('เลือกเฉพาะข้อที่ตัวเลือกเป็นรูปได้ทีเดียว', bbSelCount() === calls);
+    ok('ตารางบอกให้เห็นว่าข้อไหนตัวเลือกเป็นรูป',
+      d.getElementById('bbItems').innerHTML.indexOf('ตัวเลือกเป็นรูป') >= 0);
+    window.callAI = async function(){ throw new Error('เน็ตล่ม'); };
+    bbItems = [];
+    await bbParseAI();
+    ok('AI ล้มเหลวทุกรอบต้องไม่ทำให้โปรแกรมพัง', bbItems.length === 0);
+    CFG.key = '';
+    bbItems = [];
+    await bbParseAI();
+    ok('ยังไม่ใส่ API Key ต้องบอกให้ไปใส่ก่อน ไม่ใช่เงียบ', bbItems.length === 0);
+  } catch(err){ ok('เทสต์โหมด AI อ่านหน้าสแกนทำงานได้โดยไม่ error', false, String(err && err.message || err)); }
+  finally { bbFiles = _files; bbItems = _items; window.callAI = _ai; window.confirm = _cf; CFG.key = _key; }
 })();
 
 /* ══ 17. โครงแผนการสอน AL / GPAS 5 Steps ══ */
